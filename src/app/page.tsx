@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { BarChart as BarChartIcon, DollarSign, TrendingUp, PlusCircle } from "lucide-react";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
-import { BarChart, Bar, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip, Legend as RechartsLegend } from 'recharts';
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import Link from "next/link";
 import Image from 'next/image';
 
@@ -146,11 +146,12 @@ export default function HomePage() {
             ))}
           </CardContent>
           <CardFooter>
-            <Button variant="outline" className="w-full">Manage Budgets</Button>
+            <Link href="/budgets" className="w-full">
+              <Button variant="outline" className="w-full">Manage Budgets</Button>
+            </Link>
           </CardFooter>
         </Card>
       </div>
     </div>
   );
 }
-
