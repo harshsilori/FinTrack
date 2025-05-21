@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -11,16 +12,16 @@ import Image from 'next/image';
 
 export default function AiInsightsPage() {
   const { toast } = useToast();
-  const [transactionHistory, setTransactionHistory] = useState('');
+  const [assetSummary, setAssetSummary] = useState('');
   const [opportunities, setOpportunities] = useState<GetSavingsOpportunitiesOutput['opportunities'] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
-    if (!transactionHistory.trim()) {
+    if (!assetSummary.trim()) {
       toast({
         title: "Input Required",
-        description: "Please paste your transaction history.",
+        description: "Please paste your asset summary.",
         variant: "destructive",
       });
       return;
@@ -31,12 +32,12 @@ export default function AiInsightsPage() {
     setOpportunities(null);
 
     try {
-      const result = await getSavingsOpportunities({ transactionHistory });
+      const result = await getSavingsOpportunities({ assetSummary });
       setOpportunities(result.opportunities);
       if (!result.opportunities || result.opportunities.length === 0) {
         toast({
           title: "No Opportunities Found",
-          description: "The AI couldn't identify specific savings opportunities from the provided data, or there are none to suggest right now.",
+          description: "The AI couldn't identify specific savings or optimization opportunities from the provided asset summary, or there are none to suggest right now.",
         });
       }
     } catch (err) {
@@ -55,25 +56,25 @@ export default function AiInsightsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">AI Savings Insights</h1>
+        <h1 className="text-3xl font-bold tracking-tight">AI Financial Insights</h1>
         <p className="text-muted-foreground">
-          Paste your transaction history to get personalized savings suggestions.
+          Paste your asset summary to get personalized optimization suggestions.
         </p>
       </div>
 
       <Card className="rounded-2xl shadow-lg">
         <CardHeader>
-          <CardTitle>Transaction History Input</CardTitle>
+          <CardTitle>Asset Summary Input</CardTitle>
           <CardDescription>
-            Copy and paste your transaction data below. For example, a CSV export from your bank.
-            The more detailed the data, the better the suggestions.
+            Copy and paste a summary of your assets below. For example: "Savings Account: $12000 (0.2% APY), VTSAX Index Fund: $50000, Rental Property Equity: $75000".
+            The more detail you provide, the better the suggestions.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Textarea
-            placeholder="Paste transaction history here (e.g., Date, Description, Amount, Category)..."
-            value={transactionHistory}
-            onChange={(e) => setTransactionHistory(e.target.value)}
+            placeholder="Paste asset summary here (e.g., Asset Name: Value (details like interest rate, ticker if relevant))..."
+            value={assetSummary}
+            onChange={(e) => setAssetSummary(e.target.value)}
             rows={10}
             className="min-h-[150px] rounded-lg"
           />
@@ -83,7 +84,7 @@ export default function AiInsightsPage() {
             ) : (
               <Lightbulb className="mr-2 h-4 w-4" />
             )}
-            Get Savings Opportunities
+            Get Financial Opportunities
           </Button>
         </CardContent>
       </Card>
@@ -111,7 +112,7 @@ export default function AiInsightsPage() {
                     <CardTitle className="text-lg">{op.category}</CardTitle>
                     {op.potentialSavings && (
                        <CardDescription className="font-semibold text-green-600 dark:text-green-400">
-                        Potential Savings: {op.potentialSavings}
+                        Potential Benefit: {op.potentialSavings}
                       </CardDescription>
                     )}
                   </div>
@@ -133,9 +134,9 @@ export default function AiInsightsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              Based on the provided transaction history, the AI could not identify any specific new savings opportunities at this time.
-              This might mean you're already doing a great job, or more detailed/different data could yield other results.
-              Consider reviewing common saving strategies or trying again with more data.
+              Based on the provided asset summary, the AI could not identify any specific new optimization opportunities at this time.
+              This might mean your assets are well-optimized, or more detailed/different data could yield other results.
+              Consider reviewing common financial strategies or trying again with more data.
             </p>
           </CardContent>
         </Card>
