@@ -9,113 +9,109 @@ interface PriceFetchResult {
   priceHistory: AssetPriceData[]; 
 }
 
+// Keep mockPriceHistories in a base currency (e.g., USD-like magnitudes)
 const mockPriceHistories: Record<string, AssetPriceData[]> = {
-  default: [
-    { date: '2024-07-01', price: 100 },
-    { date: '2024-07-08', price: 102 },
-    { date: '2024-07-15', price: 101 },
-    { date: '2024-07-22', price: 105 },
-    { date: '2024-07-29', price: 108 },
+  default: [ // Suitable for general stocks
+    { date: '2024-07-01', price: 100 }, { date: '2024-07-08', price: 102 }, { date: '2024-07-15', price: 101 }, { date: '2024-07-22', price: 105 }, { date: '2024-07-29', price: 108 },
   ],
-  tech: [
-    { date: '2024-07-01', price: 200 },
-    { date: '2024-07-08', price: 205 },
-    { date: '2024-07-15', price: 210 },
-    { date: '2024-07-22', price: 208 },
-    { date: '2024-07-29', price: 215 },
+  tech: [ // Slightly different pattern for "tech" stocks
+    { date: '2024-07-01', price: 200 }, { date: '2024-07-08', price: 205 }, { date: '2024-07-15', price: 210 }, { date: '2024-07-22', price: 208 }, { date: '2024-07-29', price: 215 },
   ],
-  crypto: [ // These are USD-like base values for history scaling
-    { date: '2024-07-01', price: 0.50 },
-    { date: '2024-07-08', price: 0.55 },
-    { date: '2024-07-15', price: 0.48 },
-    { date: '2024-07-22', price: 0.60 },
-    { date: '2024-07-29', price: 0.65 },
+  crypto: [ // Base USD-like values for altcoins (e.g., $0.2 to $5 range) - this history will be scaled
+    { date: '2024-07-01', price: 0.50 }, { date: '2024-07-08', price: 0.55 }, { date: '2024-07-15', price: 0.48 }, { date: '2024-07-22', price: 0.60 }, { date: '2024-07-29', price: 0.65 },
   ],
-   mutualfund: [
-    { date: '2024-07-01', price: 50 },
-    { date: '2024-07-08', price: 51 },
-    { date: '2024-07-15', price: 50.5 },
-    { date: '2024-07-22', price: 52 },
-    { date: '2024-07-29', price: 53 },
+   mutualfund: [ // Suitable for mutual funds
+    { date: '2024-07-01', price: 50 }, { date: '2024-07-08', price: 51 }, { date: '2024-07-15', price: 50.5 }, { date: '2024-07-22', price: 52 }, { date: '2024-07-29', price: 53 },
   ],
 };
 
-/**
- * MOCK FUNCTION: Simulates fetching price data for an asset.
- * In a real application, this would make API calls to Yahoo Finance, CoinGecko, etc.
- * based on the asset category and ticker symbol.
- * The currency parameter is added but not deeply integrated into mock generation yet,
- * prices are mostly USD-centric in mocks.
- */
 export async function fetchAssetPrice(
   category: AssetCategory,
   tickerSymbol?: string,
-  currency: string = 'USD' // Added currency, defaults to USD for mock
+  currency: string = 'USD'
 ): Promise<PriceFetchResult> {
   console.log(`Simulating price fetch for ${category} - ${tickerSymbol || 'N/A'} in ${currency}`);
-
-  // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 750));
 
-  let basePriceForCalc = 100; // Base for USD-like values
+  let baseUsdEquivalentPrice: number;
   let historyKey = 'default';
   
-  // Currency multiplier relative to USD (1)
-  const currencyMultiplier = currency === 'INR' ? 80 : currency === 'EUR' ? 0.9 : currency === 'JPY' ? 150 : 1;
+  const currencyMultiplier = currency === 'INR' ? 80 : currency === 'EUR' ? 0.92 : currency === 'GBP' ? 0.79 : currency === 'JPY' ? 157 : currency === 'CAD' ? 1.37 : currency === 'AUD' ? 1.50 : 1; // USD is 1
 
   switch (category) {
     case 'stock':
-      // Generates a USD-equivalent price between $50 and $450
-      basePriceForCalc = (Math.random() * 400 + 50) * currencyMultiplier;
-      historyKey = tickerSymbol?.toLowerCase().includes('tech') ? 'tech' : 'default';
+      baseUsdEquivalentPrice = Math.random() * 400 + 50; // Base price in USD
+      historyKey = tickerSymbol?.toLowerCase().includes('tech') || tickerSymbol?.toLowerCase().includes('google') || tickerSymbol?.toLowerCase().includes('apple') ? 'tech' : 'default';
       break;
     case 'crypto':
-      // Generates a USD-equivalent price between $0.20 and $5.20 for altcoins
-      // For BTC like values, a different ticker might yield different range in a real system
-      basePriceForCalc = (Math.random() * 5 + 0.2) * currencyMultiplier;
-      historyKey = 'crypto'; // Use a history that reflects smaller price changes
+      if (tickerSymbol?.toUpperCase() === 'BTC' || tickerSymbol?.toUpperCase() === 'BTCUSD') {
+        baseUsdEquivalentPrice = Math.random() * 10000 + 60000; // e.g., $60k - $70k for BTC
+      } else if (tickerSymbol?.toUpperCase() === 'ETH' || tickerSymbol?.toUpperCase() === 'ETHUSD') {
+        baseUsdEquivalentPrice = Math.random() * 500 + 3000; // e.g., $3k - $3.5k for ETH
+      } else {
+        baseUsdEquivalentPrice = Math.random() * 5 + 0.20; // $0.20 - $5.20 for other altcoins
+      }
+      historyKey = 'crypto';
       break;
     case 'mutualfund':
-      // Generates a USD-equivalent price between $20 and $120
-      basePriceForCalc = (Math.random() * 100 + 20) * currencyMultiplier;
+      baseUsdEquivalentPrice = Math.random() * 100 + 20; // Base price in USD
       historyKey = 'mutualfund';
       break;
     case 'bank':
     case 'property':
-      // For bank/property, value is directly input, but we can simulate slight changes if refreshed
-      const existingValue = (Math.random() * 100000 + 5000) * currencyMultiplier;
-      const newCurrentPrice = existingValue * (1 + (Math.random() - 0.5) * 0.01); 
+      // For bank/property, value is assumed to be manually input in the target currency.
+      // We simulate a slight change if "refreshed".
+      const existingValueInTargetCurrency = (Math.random() * 100000 + 5000); // This mock should reflect a typical value in ANY currency for these assets
+      const newCurrentPriceInTargetCurrency = existingValueInTargetCurrency * (1 + (Math.random() - 0.5) * 0.005); // Very slight change
        return {
-        currentPrice: parseFloat(newCurrentPrice.toFixed(2)),
-        previousClosePrice: parseFloat(existingValue.toFixed(2)),
-        priceHistory: [{date: new Date(Date.now() - 86400000 * 5).toISOString().split('T')[0], price: parseFloat(existingValue.toFixed(2))}, {date: new Date().toISOString().split('T')[0], price: parseFloat(newCurrentPrice.toFixed(2))}],
+        currentPrice: parseFloat(newCurrentPriceInTargetCurrency.toFixed(2)),
+        previousClosePrice: parseFloat(existingValueInTargetCurrency.toFixed(2)), // Previous could be the same or slightly different
+        priceHistory: [
+            {date: new Date(Date.now() - 86400000 * 30).toISOString().split('T')[0], price: parseFloat(existingValueInTargetCurrency.toFixed(2))},
+            {date: new Date().toISOString().split('T')[0], price: parseFloat(newCurrentPriceInTargetCurrency.toFixed(2))}
+        ],
       };
+    default: // Should not happen
+      baseUsdEquivalentPrice = 100;
   }
 
-  const currentPrice = basePriceForCalc * (1 + (Math.random() - 0.45) * 0.1); // Fluctuate current price around the calculated base
-  const previousClosePrice = currentPrice * (1 + (Math.random() - 0.5) * 0.05); // Fluctuate previous close around current
+  // Fluctuate the USD equivalent price
+  const currentUsdEquivalentPrice = baseUsdEquivalentPrice * (1 + (Math.random() - 0.45) * 0.05); // Smaller fluctuation band
+  const previousCloseUsdEquivalentPrice = currentUsdEquivalentPrice * (1 + (Math.random() - 0.5) * 0.03); // Smaller fluctuation band
 
-  let baseHistoryPrices = mockPriceHistories[historyKey] || mockPriceHistories.default;
+  // Convert final prices to the target currency
+  const finalCurrentPrice = currentUsdEquivalentPrice * currencyMultiplier;
+  const finalPreviousClosePrice = previousCloseUsdEquivalentPrice * currencyMultiplier;
+
+  // Get base USD history and scale it
+  let baseHistoryUsdPrices = mockPriceHistories[historyKey] || mockPriceHistories.default;
   
-  // The mockPriceHistories are in USD-like magnitudes. Scale them to the currentPrice's magnitude.
-  const firstHistoryPricePoint = baseHistoryPrices[0]?.price || (historyKey === 'crypto' ? 0.5 : 100); // Default base if history is empty
-  const scaleFactor = currentPrice / (firstHistoryPricePoint * currencyMultiplier); // Scale based on target currency current price vs USD history
+  const lastBaseHistoryUsdPricePoint = baseHistoryUsdPrices.length > 0 
+    ? baseHistoryUsdPrices[baseHistoryUsdPrices.length - 1].price 
+    : baseUsdEquivalentPrice; // Fallback to baseUsdEquivalentPrice if history is empty for scaling
 
-  const priceHistory = baseHistoryPrices.map(p => ({
+  // Scale factor based on current USD equivalent price vs last USD history point
+  const scaleFactor = currentUsdEquivalentPrice / lastBaseHistoryUsdPricePoint;
+
+  const priceHistoryInTargetCurrency = baseHistoryUsdPrices.map(p => {
+    // p.price is a USD-equivalent value from mockPriceHistories
+    const scaledUsdHistoryPoint = p.price * scaleFactor * (1 + (Math.random() - 0.5) * 0.02); // Apply scale and slight random variation to USD value
+    return {
       ...p,
-      // Apply currencyMultiplier to the original USD-like history price, then scale factor, then slight random variation
-      price: parseFloat(((p.price * currencyMultiplier) * scaleFactor * (1 + (Math.random() - 0.5) * 0.02)).toFixed(2))
-  }));
+      price: parseFloat((scaledUsdHistoryPoint * currencyMultiplier).toFixed(2)) // Convert to target currency
+    };
+  });
   
-  // Ensure the last point in the history matches the just-fetched current price
-  if (priceHistory.length > 0) {
-      priceHistory[priceHistory.length -1].price = parseFloat(currentPrice.toFixed(2));
+  // Ensure the last point in the history matches the finalCurrentPrice (in target currency)
+  if (priceHistoryInTargetCurrency.length > 0) {
+      priceHistoryInTargetCurrency[priceHistoryInTargetCurrency.length - 1].price = parseFloat(finalCurrentPrice.toFixed(2));
+  } else { // If somehow base history was empty, create a single point for current price
+      priceHistoryInTargetCurrency.push({ date: new Date().toISOString().split('T')[0], price: parseFloat(finalCurrentPrice.toFixed(2))});
   }
-
 
   return {
-    currentPrice: parseFloat(currentPrice.toFixed(2)),
-    previousClosePrice: parseFloat(previousClosePrice.toFixed(2)),
-    priceHistory: priceHistory,
+    currentPrice: parseFloat(finalCurrentPrice.toFixed(2)),
+    previousClosePrice: parseFloat(finalPreviousClosePrice.toFixed(2)),
+    priceHistory: priceHistoryInTargetCurrency,
   };
 }
