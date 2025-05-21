@@ -6,8 +6,7 @@ import type { AssetCategory, AssetPriceData } from '@/contexts/AssetContext';
 interface PriceFetchResult {
   currentPrice: number;
   previousClosePrice: number;
-  priceHistory: AssetPriceData[]; // Simplified history for the chart
-  // In a real scenario, you might get more data like 52-week high/low, etc.
+  priceHistory: AssetPriceData[]; 
 }
 
 const mockPriceHistories: Record<string, AssetPriceData[]> = {
@@ -45,54 +44,66 @@ const mockPriceHistories: Record<string, AssetPriceData[]> = {
  * MOCK FUNCTION: Simulates fetching price data for an asset.
  * In a real application, this would make API calls to Yahoo Finance, CoinGecko, etc.
  * based on the asset category and ticker symbol.
+ * The currency parameter is added but not deeply integrated into mock generation yet,
+ * prices are mostly USD-centric in mocks.
  */
 export async function fetchAssetPrice(
   category: AssetCategory,
-  tickerSymbol?: string
+  tickerSymbol?: string,
+  currency: string = 'USD' // Added currency, defaults to USD for mock
 ): Promise<PriceFetchResult> {
-  console.log(`Simulating price fetch for ${category} - ${tickerSymbol || 'N/A'}`);
+  console.log(`Simulating price fetch for ${category} - ${tickerSymbol || 'N/A'} in ${currency}`);
 
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 750));
 
-  let basePrice = 100;
+  let basePrice = 100; // Base for USD-like values
   let historyKey = 'default';
+
+  // Adjust basePrice slightly if non-USD, for more varied mock data
+  // This is a very rough simulation and not real conversion
+  if (currency === 'INR') basePrice *= 80;
+  else if (currency === 'EUR') basePrice *= 0.9;
+  else if (currency === 'JPY') basePrice *= 150;
+
 
   switch (category) {
     case 'stock':
-      basePrice = Math.random() * 400 + 50; // Random stock price between 50 and 450
+      basePrice = (Math.random() * 400 + 50) * (currency === 'INR' ? 80 : currency === 'EUR' ? 0.9 : currency === 'JPY' ? 150 : 1);
       historyKey = tickerSymbol?.toLowerCase().includes('tech') ? 'tech' : 'default';
       break;
     case 'crypto':
-      basePrice = Math.random() * 10000 + 1000; // Random crypto price between 1000 and 11000
+      basePrice = (Math.random() * 10000 + 1000) * (currency === 'INR' ? 80 : currency === 'EUR' ? 0.9 : currency === 'JPY' ? 150 : 1);
       historyKey = 'crypto';
       break;
     case 'mutualfund':
-      basePrice = Math.random() * 100 + 20; // Random MF NAV between 20 and 120
+      basePrice = (Math.random() * 100 + 20) * (currency === 'INR' ? 80 : currency === 'EUR' ? 0.9 : currency === 'JPY' ? 150 : 1);
       historyKey = 'mutualfund';
       break;
     case 'bank':
     case 'property':
-      // For bank/property, price is usually manually entered or from a different source.
-      // This function might not be called, or return a stable value.
-      // For simulation, let's assume a slight random fluctuation if fetched.
-      const existingValue = Math.random() * 100000 + 5000;
-      const newCurrentPrice = existingValue * (1 + (Math.random() - 0.5) * 0.01); // +/- 0.5% change
+      const existingValue = (Math.random() * 100000 + 5000) * (currency === 'INR' ? 80 : currency === 'EUR' ? 0.9 : currency === 'JPY' ? 150 : 1);
+      const newCurrentPrice = existingValue * (1 + (Math.random() - 0.5) * 0.01); 
        return {
         currentPrice: parseFloat(newCurrentPrice.toFixed(2)),
         previousClosePrice: parseFloat(existingValue.toFixed(2)),
-        priceHistory: [{date: new Date(Date.now() - 86400000 * 5).toISOString().split('T')[0], price: existingValue}, {date: new Date().toISOString().split('T')[0], price: newCurrentPrice}],
+        priceHistory: [{date: new Date(Date.now() - 86400000 * 5).toISOString().split('T')[0], price: parseFloat(existingValue.toFixed(2))}, {date: new Date().toISOString().split('T')[0], price: parseFloat(newCurrentPrice.toFixed(2))}],
       };
   }
 
-  const currentPrice = basePrice * (1 + (Math.random() - 0.5) * 0.1); // +/- 5% fluctuation
-  const previousClosePrice = currentPrice * (1 + (Math.random() - 0.5) * 0.05); // +/- 2.5% from current for prev close
+  const currentPrice = basePrice * (1 + (Math.random() - 0.5) * 0.1); 
+  const previousClosePrice = currentPrice * (1 + (Math.random() - 0.5) * 0.05); 
 
-  const priceHistory = (mockPriceHistories[historyKey] || mockPriceHistories.default).map(p => ({
+  let baseHistoryPrices = mockPriceHistories[historyKey] || mockPriceHistories.default;
+  // If basePrice was significantly scaled (e.g. for INR/JPY), scale history too.
+  const scaleFactor = basePrice / (mockPriceHistories[historyKey]?.[0]?.price || 100);
+
+
+  const priceHistory = baseHistoryPrices.map(p => ({
       ...p,
-      price: parseFloat((p.price * (basePrice / 100) * (1 + (Math.random() - 0.5) * 0.02)).toFixed(2)) // Scale and add slight randomness
+      price: parseFloat((p.price * scaleFactor * (1 + (Math.random() - 0.5) * 0.02)).toFixed(2))
   }));
-  // Ensure the last point in history somewhat matches currentPrice for realism
+  
   if (priceHistory.length > 0) {
       priceHistory[priceHistory.length -1].price = parseFloat(currentPrice.toFixed(2));
   }
@@ -104,3 +115,5 @@ export async function fetchAssetPrice(
     priceHistory: priceHistory,
   };
 }
+
+    

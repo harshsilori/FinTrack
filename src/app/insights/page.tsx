@@ -25,7 +25,7 @@ export default function AiInsightsPage() {
     return currentAssets
       .map(asset => {
         const marketValue = getAssetMarketValue(asset);
-        let detail = `${asset.name}: $${marketValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} (Category: ${asset.category}`;
+        let detail = `${asset.name}: ${asset.currency} ${marketValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} (Category: ${asset.category}`;
         if (asset.tickerSymbol) detail += `, Ticker: ${asset.tickerSymbol}`;
         detail += ')';
         return detail;
