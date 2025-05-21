@@ -27,7 +27,7 @@ const mockPriceHistoryPatterns: Record<string, AssetPriceData[]> = {
   cryptoMajorETH: [ // Pattern for ETH
     { date: '2024-07-01', price: 3000 }, { date: '2024-07-08', price: 3200 }, { date: '2024-07-15', price: 2900 }, { date: '2024-07-22', price: 3300 }, { date: '2024-07-29', price: 3500 },
   ],
-   cryptoADA: [ // Specific pattern for Cardano (ADA) to match INR ~65 example
+   cryptoADA: [ // Specific pattern for Cardano (ADA)
     { date: '2024-07-01', price: 60 }, { date: '2024-07-08', price: 62 }, { date: '2024-07-15', price: 58 }, { date: '2024-07-22', price: 66 }, { date: '2024-07-29', price: 70 },
   ],
    mutualfund: [ // Suitable for mutual funds
@@ -74,7 +74,7 @@ export async function fetchAssetPrice(
       const upperTicker = tickerSymbol?.toUpperCase();
       if (upperTicker === 'BTC' || upperTicker === 'BTCUSD') {
         historyPatternKey = 'cryptoMajorBTC';
-        if (currency === 'INR') baseTargetPriceInCurrency = 4800000 + deterministicFactor * (800000); // 4.8M - 5.6M INR
+        if (currency === 'INR') baseTargetPriceInCurrency = 5000000 + deterministicFactor * (1000000); // 5.0M - 6.0M INR
         else if (currency === 'EUR') baseTargetPriceInCurrency = 55000 + deterministicFactor * (10000); // 55k - 65k EUR
         else baseTargetPriceInCurrency = 60000 + deterministicFactor * (10000); // 60k - 70k USD
       } else if (upperTicker === 'ETH' || upperTicker === 'ETHUSD') {
@@ -89,7 +89,7 @@ export async function fetchAssetPrice(
         else baseTargetPriceInCurrency = 0.6 + deterministicFactor * (0.4); // Range 0.6 - 1.0 USD
       } else { // General altcoins
         historyPatternKey = 'cryptoGeneral';
-        if (currency === 'INR') baseTargetPriceInCurrency = 15 + deterministicFactor * (200 - 15);     // e.g. 15 - 200 INR
+        if (currency === 'INR') baseTargetPriceInCurrency = 15 + deterministicFactor * (185 - 15);     // e.g. 15 - 185 INR (updated range from 200)
         else if (currency === 'EUR') baseTargetPriceInCurrency = 0.15 + deterministicFactor * (2.5 - 0.15); // e.g. 0.15 - 2.5 EUR
         else baseTargetPriceInCurrency = 0.2 + deterministicFactor * (3 - 0.2);     // e.g. 0.2 - 3 USD
       }
@@ -106,24 +106,29 @@ export async function fetchAssetPrice(
       break;
     case 'bank':
     case 'property':
+      // For bank/property, the 'currentPrice' in AssetContext is the total value.
+      // The fetch operation can simulate a slight change if desired, or just return existing.
+      // For simplicity, let's assume these don't auto-fetch volatile prices this way.
+      // Their value update is more manual or via statement uploads in a real app.
+      // We'll return a slightly fluctuated version of a hypothetical "stable" value for mock purposes.
       const existingValueBase = (currency === 'INR' ? 500000 : currency === 'EUR' ? 75000 : 100000);
-      const stableBase = existingValueBase + deterministicFactor * (existingValueBase * 0.5); 
+      const stableBase = existingValueBase + deterministicFactor * (existingValueBase * 0.5); // More varied base
       
-      const currentPriceForNonTrackable = stableBase * (1 + (Math.random() - 0.5) * 0.005); 
-      const previousCloseForNonTrackable = currentPriceForNonTrackable * (1 + (Math.random() - 0.5) * 0.002);
+      const currentPriceForNonTrackable = stableBase * (1 + (Math.random() - 0.5) * 0.005); // Very small daily fluctuation (0.5%)
+      const previousCloseForNonTrackable = currentPriceForNonTrackable * (1 + (Math.random() - 0.5) * 0.002); // Even smaller change for prev close
        return {
         currentPrice: parseFloat(currentPriceForNonTrackable.toFixed(2)),
         previousClosePrice: parseFloat(previousCloseForNonTrackable.toFixed(2)),
-        priceHistory: [
+        priceHistory: [ // Simple history for bank/property
             {date: new Date(Date.now() - 86400000 * 30).toISOString().split('T')[0], price: parseFloat((stableBase * 0.99).toFixed(2))}, 
             {date: new Date().toISOString().split('T')[0], price: parseFloat(currentPriceForNonTrackable.toFixed(2))}
         ],
       };
-    default: 
-      baseTargetPriceInCurrency = 100; 
+    default: // Should not happen if categories are well-defined
+      baseTargetPriceInCurrency = 100; // Fallback default
   }
 
-  // Fluctuate the currentPrice slightly around the baseTargetPriceInCurrency
+  // Fluctuate the currentPrice slightly around the baseTargetPriceInCurrency for trackable assets
   const currentPriceInTargetCurrency = baseTargetPriceInCurrency * (1 + (Math.random() - 0.5) * 0.06); // Fluctuate by +/- 3%
 
   // previousClosePrice is a small fluctuation from the currentPrice
@@ -131,21 +136,27 @@ export async function fetchAssetPrice(
 
   // --- Price History Scaling ---
   let baseHistoryPattern = mockPriceHistoryPatterns[historyPatternKey] || mockPriceHistoryPatterns.default;
-  const lastPatternPoint = baseHistoryPattern.length > 0 ? baseHistoryPattern[baseHistoryPattern.length - 1].price : currentPriceInTargetCurrency;
+  // The last point in the pattern should correspond to a "base" from which current price is derived.
+  // To scale correctly, we find the ratio of the generated current price (in target currency)
+  // to the last point of the selected history pattern (which is just a relative pattern).
+  const lastPatternPointValue = baseHistoryPattern.length > 0 ? baseHistoryPattern[baseHistoryPattern.length - 1].price : currentPriceInTargetCurrency;
   
-  const scaleFactor = lastPatternPoint !== 0 ? currentPriceInTargetCurrency / lastPatternPoint : 1;
+  // Scale factor: how much to multiply each point in the pattern by to make its end align with our generated current price.
+  const scaleFactor = lastPatternPointValue !== 0 ? currentPriceInTargetCurrency / lastPatternPointValue : 1;
 
   const finalPriceHistory = baseHistoryPattern.map(p => {
-    const jitter = 1 + (Math.random() - 0.5) * 0.02; 
+    // Optional: Add a tiny bit of extra jitter to each historical point if desired
+    // const jitter = 1 + (Math.random() - 0.5) * 0.02; // +/- 1% jitter
     return {
       ...p,
-      price: parseFloat((p.price * scaleFactor * jitter).toFixed(2))
+      price: parseFloat((p.price * scaleFactor /* * jitter */).toFixed(2)) // Apply scale factor
     };
   });
 
+  // Ensure the very last point in the history exactly matches the fetched current price
   if (finalPriceHistory.length > 0) {
       finalPriceHistory[finalPriceHistory.length - 1].price = parseFloat(currentPriceInTargetCurrency.toFixed(2));
-  } else { 
+  } else { // If no history pattern, create a single point
       finalPriceHistory.push({ date: new Date().toISOString().split('T')[0], price: parseFloat(currentPriceInTargetCurrency.toFixed(2))});
   }
 
@@ -156,3 +167,4 @@ export async function fetchAssetPrice(
   };
 }
 
+    
