@@ -19,13 +19,16 @@ const mockPriceHistoryPatterns: Record<string, AssetPriceData[]> = {
     { date: '2024-07-01', price: 200 }, { date: '2024-07-08', price: 205 }, { date: '2024-07-15', price: 210 }, { date: '2024-07-22', price: 208 }, { date: '2024-07-29', price: 215 },
   ],
   cryptoGeneral: [ // Pattern for general altcoins
-    { date: '2024-07-01', price: 0.50 }, { date: '2024-07-08', price: 0.55 }, { date: '2024-07-15', price: 0.48 }, { date: '2024-07-22', price: 0.60 }, { date: '2024-07-29', price: 0.65 },
+    { date: '2024-07-01', price: 0.80 }, { date: '2024-07-08', price: 0.85 }, { date: '2024-07-15', price: 0.78 }, { date: '2024-07-22', price: 0.90 }, { date: '2024-07-29', price: 0.95 },
   ],
   cryptoMajorBTC: [ // Pattern for BTC
     { date: '2024-07-01', price: 60000 }, { date: '2024-07-08', price: 62000 }, { date: '2024-07-15', price: 59000 }, { date: '2024-07-22', price: 63000 }, { date: '2024-07-29', price: 65000 },
   ],
   cryptoMajorETH: [ // Pattern for ETH
     { date: '2024-07-01', price: 3000 }, { date: '2024-07-08', price: 3200 }, { date: '2024-07-15', price: 2900 }, { date: '2024-07-22', price: 3300 }, { date: '2024-07-29', price: 3500 },
+  ],
+   cryptoADA: [ // Specific pattern for Cardano (ADA) to match INR ~65 example
+    { date: '2024-07-01', price: 60 }, { date: '2024-07-08', price: 62 }, { date: '2024-07-15', price: 58 }, { date: '2024-07-22', price: 66 }, { date: '2024-07-29', price: 70 },
   ],
    mutualfund: [ // Suitable for mutual funds
     { date: '2024-07-01', price: 50 }, { date: '2024-07-08', price: 51 }, { date: '2024-07-15', price: 50.5 }, { date: '2024-07-22', price: 52 }, { date: '2024-07-29', price: 53 },
@@ -55,7 +58,7 @@ export async function fetchAssetPrice(
   let historyPatternKey = 'default';
   const deterministicFactor = getDeterministicFactor(tickerSymbol); // Factor based on ticker
 
-  // --- Generate baseTargetPriceInCurrency with currency-specific magnitudes and deterministic factor ---
+  // --- Generate baseTargetPriceInCurrency directly in the target currency ---
   switch (category) {
     case 'stock':
       historyPatternKey = tickerSymbol?.toLowerCase().includes('tech') || tickerSymbol?.toLowerCase().includes('google') || tickerSymbol?.toLowerCase().includes('apple') ? 'tech' : 'default';
@@ -71,19 +74,24 @@ export async function fetchAssetPrice(
       const upperTicker = tickerSymbol?.toUpperCase();
       if (upperTicker === 'BTC' || upperTicker === 'BTCUSD') {
         historyPatternKey = 'cryptoMajorBTC';
-        if (currency === 'INR') baseTargetPriceInCurrency = 4800000 + deterministicFactor * (800000); // 48L - 56L INR
+        if (currency === 'INR') baseTargetPriceInCurrency = 4800000 + deterministicFactor * (800000); // 4.8M - 5.6M INR
         else if (currency === 'EUR') baseTargetPriceInCurrency = 55000 + deterministicFactor * (10000); // 55k - 65k EUR
         else baseTargetPriceInCurrency = 60000 + deterministicFactor * (10000); // 60k - 70k USD
       } else if (upperTicker === 'ETH' || upperTicker === 'ETHUSD') {
         historyPatternKey = 'cryptoMajorETH';
-        if (currency === 'INR') baseTargetPriceInCurrency = 240000 + deterministicFactor * (40000);  // 2.4L - 2.8L INR
+        if (currency === 'INR') baseTargetPriceInCurrency = 240000 + deterministicFactor * (40000);  // 240k - 280k INR
         else if (currency === 'EUR') baseTargetPriceInCurrency = 2800 + deterministicFactor * (500);    // 2.8k - 3.3k EUR
         else baseTargetPriceInCurrency = 3000 + deterministicFactor * (500);    // 3k - 3.5k USD
+      } else if (upperTicker === 'ADA') { // Specific case for Cardano (ADA)
+        historyPatternKey = 'cryptoADA';
+        if (currency === 'INR') baseTargetPriceInCurrency = 50 + deterministicFactor * (30); // Range 50 - 80 INR
+        else if (currency === 'EUR') baseTargetPriceInCurrency = 0.5 + deterministicFactor * (0.3); // Range 0.5 - 0.8 EUR
+        else baseTargetPriceInCurrency = 0.6 + deterministicFactor * (0.4); // Range 0.6 - 1.0 USD
       } else { // General altcoins
         historyPatternKey = 'cryptoGeneral';
-        if (currency === 'INR') baseTargetPriceInCurrency = 20 + deterministicFactor * (400 - 20);     // e.g. 20 - 400 INR
-        else if (currency === 'EUR') baseTargetPriceInCurrency = 0.2 + deterministicFactor * (5 - 0.2); // e.g. 0.2 - 5 EUR
-        else baseTargetPriceInCurrency = 0.2 + deterministicFactor * (5 - 0.2);     // e.g. 0.2 - 5 USD
+        if (currency === 'INR') baseTargetPriceInCurrency = 15 + deterministicFactor * (200 - 15);     // e.g. 15 - 200 INR
+        else if (currency === 'EUR') baseTargetPriceInCurrency = 0.15 + deterministicFactor * (2.5 - 0.15); // e.g. 0.15 - 2.5 EUR
+        else baseTargetPriceInCurrency = 0.2 + deterministicFactor * (3 - 0.2);     // e.g. 0.2 - 3 USD
       }
       break;
     case 'mutualfund':
@@ -98,26 +106,24 @@ export async function fetchAssetPrice(
       break;
     case 'bank':
     case 'property':
-      // For bank/property, value is assumed to be manually input or from statements.
-      // Simulate a slight change from a large, somewhat stable base if "refreshed".
       const existingValueBase = (currency === 'INR' ? 500000 : currency === 'EUR' ? 75000 : 100000);
-      const stableBase = existingValueBase + deterministicFactor * (existingValueBase * 0.5); // Stable base for this asset
+      const stableBase = existingValueBase + deterministicFactor * (existingValueBase * 0.5); 
       
-      const currentPriceForNonTrackable = stableBase * (1 + (Math.random() - 0.5) * 0.005); // Tiny fluctuation +/- 0.25%
-      const previousCloseForNonTrackable = currentPriceForNonTrackable * (1 + (Math.random() - 0.5) * 0.002); // Even smaller diff for prev close
+      const currentPriceForNonTrackable = stableBase * (1 + (Math.random() - 0.5) * 0.005); 
+      const previousCloseForNonTrackable = currentPriceForNonTrackable * (1 + (Math.random() - 0.5) * 0.002);
        return {
         currentPrice: parseFloat(currentPriceForNonTrackable.toFixed(2)),
         previousClosePrice: parseFloat(previousCloseForNonTrackable.toFixed(2)),
         priceHistory: [
-            {date: new Date(Date.now() - 86400000 * 30).toISOString().split('T')[0], price: parseFloat((stableBase * 0.99).toFixed(2))}, // Price 30 days ago
+            {date: new Date(Date.now() - 86400000 * 30).toISOString().split('T')[0], price: parseFloat((stableBase * 0.99).toFixed(2))}, 
             {date: new Date().toISOString().split('T')[0], price: parseFloat(currentPriceForNonTrackable.toFixed(2))}
         ],
       };
-    default: // Should not happen
-      baseTargetPriceInCurrency = 100; // Fallback
+    default: 
+      baseTargetPriceInCurrency = 100; 
   }
 
-  // Fluctuate the currentPrice slightly around the baseTargetPriceInCurrency for more realism on "fetch"
+  // Fluctuate the currentPrice slightly around the baseTargetPriceInCurrency
   const currentPriceInTargetCurrency = baseTargetPriceInCurrency * (1 + (Math.random() - 0.5) * 0.06); // Fluctuate by +/- 3%
 
   // previousClosePrice is a small fluctuation from the currentPrice
@@ -127,22 +133,19 @@ export async function fetchAssetPrice(
   let baseHistoryPattern = mockPriceHistoryPatterns[historyPatternKey] || mockPriceHistoryPatterns.default;
   const lastPatternPoint = baseHistoryPattern.length > 0 ? baseHistoryPattern[baseHistoryPattern.length - 1].price : currentPriceInTargetCurrency;
   
-  // Avoid division by zero if lastPatternPoint is 0
   const scaleFactor = lastPatternPoint !== 0 ? currentPriceInTargetCurrency / lastPatternPoint : 1;
 
   const finalPriceHistory = baseHistoryPattern.map(p => {
-    // Add a tiny random jitter to each historical point for more visual variety
-    const jitter = 1 + (Math.random() - 0.5) * 0.02; // +/- 1% jitter
+    const jitter = 1 + (Math.random() - 0.5) * 0.02; 
     return {
       ...p,
       price: parseFloat((p.price * scaleFactor * jitter).toFixed(2))
     };
   });
 
-  // Ensure the last point in the history matches the finalCurrentPrice accurately
   if (finalPriceHistory.length > 0) {
       finalPriceHistory[finalPriceHistory.length - 1].price = parseFloat(currentPriceInTargetCurrency.toFixed(2));
-  } else { // Fallback if history pattern was empty
+  } else { 
       finalPriceHistory.push({ date: new Date().toISOString().split('T')[0], price: parseFloat(currentPriceInTargetCurrency.toFixed(2))});
   }
 
@@ -152,3 +155,4 @@ export async function fetchAssetPrice(
     priceHistory: finalPriceHistory,
   };
 }
+
