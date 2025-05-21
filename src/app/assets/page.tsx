@@ -26,11 +26,10 @@ const assetIcons: Record<AssetCategory, React.ReactNode> = {
 
 const initialAssetFormState: Partial<ContextAsset> = {
   name: '',
-  category: 'stock', // Default to a trackable asset type
+  category: 'stock', 
   quantity: 1,
-  purchasePrice: 0, // Shown for trackable
-  tickerSymbol: '',   // Shown for trackable
-  // currentPrice for bank/property will be set if category changes
+  purchasePrice: 0, 
+  tickerSymbol: '',  
 };
 
 
@@ -54,13 +53,13 @@ export default function AssetsPage() {
     if (asset) {
       setCurrentAsset({ ...asset });
     } else {
-      // New asset: initialize based on default category 'stock'
       setCurrentAsset({
         name: '',
-        category: 'stock',
+        category: 'stock', // Default category
         quantity: 1,
         purchasePrice: 0,
         tickerSymbol: '',
+        currentPrice: undefined, // Ensure currentPrice is not carried over from non-trackable to trackable
       });
     }
     setIsFormOpen(true);
@@ -94,14 +93,15 @@ export default function AssetsPage() {
       toast({ title: "Error", description: "Please fill name and category.", variant: "destructive" });
       return;
     }
+    
+    const isTrackableType = currentAsset.category === 'stock' || currentAsset.category === 'crypto' || currentAsset.category === 'mutualfund';
+
     if (currentAsset.quantity === undefined || currentAsset.quantity <= 0) {
         toast({ title: "Error", description: "Quantity must be greater than zero.", variant: "destructive" });
         return;
     }
 
-    const isTrackable = currentAsset.category === 'stock' || currentAsset.category === 'crypto' || currentAsset.category === 'mutualfund';
-
-    if (isTrackable) {
+    if (isTrackableType) {
         if (!currentAsset.tickerSymbol) {
             toast({ title: "Error", description: "Ticker symbol is required for stocks, crypto, and mutual funds.", variant: "destructive" });
             return;
@@ -124,9 +124,10 @@ export default function AssetsPage() {
         category: currentAsset.category!,
         quantity: Number(currentAsset.quantity) || 0,
       };
-      if (isTrackable) {
+      if (isTrackableType) {
         payloadForUpdate.tickerSymbol = currentAsset.tickerSymbol;
         payloadForUpdate.purchasePrice = Number(currentAsset.purchasePrice) || 0;
+        // currentPrice and previousClosePrice for trackable assets are handled by refresh mechanism
       } else { // bank or property
         payloadForUpdate.currentPrice = Number(currentAsset.currentPrice) || 0;
       }
@@ -137,16 +138,16 @@ export default function AssetsPage() {
         name: currentAsset.name!,
         category: currentAsset.category!,
         quantity: Number(currentAsset.quantity) || 0,
-        purchasePrice: isTrackable ? (Number(currentAsset.purchasePrice) || 0) : undefined,
-        currentPrice: isTrackable ? (Number(currentAsset.purchasePrice) || 0) : (Number(currentAsset.currentPrice) || 0), // For trackable, initial current = purchase
-        tickerSymbol: isTrackable ? currentAsset.tickerSymbol : undefined,
-        previousClosePrice: isTrackable ? (Number(currentAsset.purchasePrice) || 0) : undefined, // For trackable, initial prevClose = purchase
+        purchasePrice: isTrackableType ? (Number(currentAsset.purchasePrice) || 0) : undefined,
+        currentPrice: isTrackableType ? (Number(currentAsset.purchasePrice) || 0) : (Number(currentAsset.currentPrice) || 0),
+        tickerSymbol: isTrackableType ? currentAsset.tickerSymbol : undefined,
+        previousClosePrice: isTrackableType ? (Number(currentAsset.purchasePrice) || 0) : undefined,
       };
       addAsset(newAssetPayload);
       toast({ title: "Asset Added", description: `${newAssetPayload.name} has been added.` });
     }
     setIsFormOpen(false);
-    setCurrentAsset(initialAssetFormState); // Reset form state
+    setCurrentAsset(initialAssetFormState); 
   };
 
   const handleDeleteAsset = (id: string) => {
@@ -171,9 +172,9 @@ export default function AssetsPage() {
 
   const handleCategoryChange = (value: AssetCategory) => {
     const newState: Partial<ContextAsset> = { ...currentAsset, category: value };
-    const isTrackable = value === 'stock' || value === 'crypto' || value === 'mutualfund';
+    const isTrackableType = value === 'stock' || value === 'crypto' || value === 'mutualfund';
 
-    if (isTrackable) {
+    if (isTrackableType) {
         newState.tickerSymbol = currentAsset?.tickerSymbol || '';
         newState.purchasePrice = currentAsset?.purchasePrice === undefined ? 0 : currentAsset.purchasePrice;
         newState.quantity = currentAsset?.quantity === undefined ? 1 : currentAsset.quantity;
@@ -277,7 +278,7 @@ export default function AssetsPage() {
               <RefreshCcw className={`mr-2 h-4 w-4 ${isFetchingPrice[asset.id] ? 'animate-spin' : ''}`} /> Refresh
             </Button>
            )}
-           <div className={`flex justify-end gap-1 ${!isTrackableAsset ? 'w-full' : ''}`}> {/* Ensure edit/delete are on right for bank/property */}
+           <div className={`flex justify-end gap-1 ${!isTrackableAsset ? 'w-full' : ''}`}>
               <Button variant="ghost" size="icon" onClick={() => openForm(asset)} aria-label="Edit asset">
                 <Edit3 className="h-4 w-4" />
               </Button>
@@ -316,7 +317,12 @@ export default function AssetsPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="name" className="text-right">Name</Label>
-                <Input id="name" value={currentAsset?.name || ''} onChange={(e) => setCurrentAsset({...currentAsset, name: e.target.value })} className="col-span-3" placeholder="e.g. My Savings, Bitcoin" />
+                <div className="col-span-3">
+                  <Input id="name" value={currentAsset?.name || ''} onChange={(e) => setCurrentAsset({...currentAsset, name: e.target.value })} placeholder="e.g. My Savings, Bitcoin" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Dynamic name suggestions are planned for a future update.
+                  </p>
+                </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="category" className="text-right">Category</Label>
@@ -342,7 +348,12 @@ export default function AssetsPage() {
                 <>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="tickerSymbol" className="text-right">Ticker</Label>
-                    <Input id="tickerSymbol" value={currentAsset?.tickerSymbol || ''} onChange={(e) => setCurrentAsset({...currentAsset, tickerSymbol: e.target.value.toUpperCase() })} className="col-span-3" placeholder="e.g. AAPL, BTCUSD" />
+                    <div className="col-span-3">
+                      <Input id="tickerSymbol" value={currentAsset?.tickerSymbol || ''} onChange={(e) => setCurrentAsset({...currentAsset, tickerSymbol: e.target.value.toUpperCase() })} placeholder="e.g. AAPL, BTCUSD" />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Automatic ticker fetching from name is planned. For now, please provide the ticker for stocks, crypto, and mutual funds.
+                      </p>
+                    </div>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="purchasePrice" className="text-right">Purchase Price</Label>
@@ -400,3 +411,4 @@ export default function AssetsPage() {
     </div>
   );
 }
+
