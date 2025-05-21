@@ -3,27 +3,40 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Lightbulb, Loader2, AlertTriangle } from 'lucide-react';
+import { Lightbulb, Loader2, AlertTriangle, Info } from 'lucide-react';
 import { getSavingsOpportunities, type GetSavingsOpportunitiesOutput } from '@/ai/flows/savings-opportunities';
 import { useToast } from "@/hooks/use-toast";
 import Image from 'next/image';
+import { useAssets } from '@/contexts/AssetContext';
+import type { Asset as ContextAsset } from '@/contexts/AssetContext';
+import Link from 'next/link';
 
 export default function AiInsightsPage() {
   const { toast } = useToast();
-  const [assetSummary, setAssetSummary] = useState('');
+  const { assets } = useAssets(); 
   const [opportunities, setOpportunities] = useState<GetSavingsOpportunitiesOutput['opportunities'] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const formatAssetSummary = (currentAssets: ContextAsset[]): string => {
+    if (!currentAssets || currentAssets.length === 0) {
+      return "No assets available.";
+    }
+    return currentAssets
+      .map(asset => `${asset.name}: $${asset.value.toLocaleString()} (Type: ${asset.type}${asset.type === 'bank' ? '' : ''})`) // Example: Adding APY for bank if available
+      .join(', ');
+  };
+
   const handleSubmit = async () => {
-    if (!assetSummary.trim()) {
+    if (!assets || assets.length === 0) {
       toast({
-        title: "Input Required",
-        description: "Please paste your asset summary.",
-        variant: "destructive",
+        title: "No Assets Found",
+        description: "Please add some assets on the Assets page first to get insights.",
+        variant: "default",
       });
+      setError("No assets available to analyze. Please add assets on the Assets page.");
+      setOpportunities(null);
       return;
     }
 
@@ -31,13 +44,15 @@ export default function AiInsightsPage() {
     setError(null);
     setOpportunities(null);
 
+    const currentAssetSummary = formatAssetSummary(assets);
+
     try {
-      const result = await getSavingsOpportunities({ assetSummary });
+      const result = await getSavingsOpportunities({ assetSummary: currentAssetSummary });
       setOpportunities(result.opportunities);
       if (!result.opportunities || result.opportunities.length === 0) {
         toast({
-          title: "No Opportunities Found",
-          description: "The AI couldn't identify specific savings or optimization opportunities from the provided asset summary, or there are none to suggest right now.",
+          title: "No Specific Opportunities Found",
+          description: "The AI couldn't identify specific new savings or optimization opportunities from your current assets.",
         });
       }
     } catch (err) {
@@ -58,27 +73,25 @@ export default function AiInsightsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">AI Financial Insights</h1>
         <p className="text-muted-foreground">
-          Paste your asset summary to get personalized optimization suggestions.
+          Get personalized optimization suggestions based on your currently tracked assets.
         </p>
       </div>
 
       <Card className="rounded-2xl shadow-lg">
         <CardHeader>
-          <CardTitle>Asset Summary Input</CardTitle>
+          <CardTitle>Asset Analysis</CardTitle>
           <CardDescription>
-            Copy and paste a summary of your assets below. For example: "Savings Account: $12000 (0.2% APY), VTSAX Index Fund: $50000, Rental Property Equity: $75000".
-            The more detail you provide, the better the suggestions.
+            Click the button below to analyze your assets (from the Assets page) and generate financial opportunities.
+            {(!assets || assets.length === 0) && (
+                <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
+                    <Info className="h-5 w-5 text-primary" />
+                    <span>No assets are currently being tracked. Please go to the <Link href="/assets" className="underline hover:text-primary">Assets page</Link> to add some.</span>
+                </div>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Textarea
-            placeholder="Paste asset summary here (e.g., Asset Name: Value (details like interest rate, ticker if relevant))..."
-            value={assetSummary}
-            onChange={(e) => setAssetSummary(e.target.value)}
-            rows={10}
-            className="min-h-[150px] rounded-lg"
-          />
-          <Button onClick={handleSubmit} disabled={isLoading} className="w-full sm:w-auto">
+          <Button onClick={handleSubmit} disabled={isLoading || !assets || assets.length === 0} className="w-full sm:w-auto">
             {isLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -89,11 +102,11 @@ export default function AiInsightsPage() {
         </CardContent>
       </Card>
 
-      {error && (
+      {error && (!isLoading && (!opportunities || opportunities.length === 0)) && (
         <Card className="rounded-2xl shadow-lg border-destructive">
           <CardHeader className="flex flex-row items-center gap-2">
             <AlertTriangle className="h-6 w-6 text-destructive" />
-            <CardTitle className="text-destructive">Error</CardTitle>
+            <CardTitle className="text-destructive">Analysis Information</CardTitle>
           </CardHeader>
           <CardContent>
             <p>{error}</p>
@@ -127,16 +140,15 @@ export default function AiInsightsPage() {
         </div>
       )}
 
-      {opportunities && opportunities.length === 0 && !isLoading && !error && (
+      { !isLoading && !error && opportunities && opportunities.length === 0 && (
          <Card className="rounded-2xl shadow-lg">
           <CardHeader>
             <CardTitle>No Specific Opportunities Found</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              Based on the provided asset summary, the AI could not identify any specific new optimization opportunities at this time.
-              This might mean your assets are well-optimized, or more detailed/different data could yield other results.
-              Consider reviewing common financial strategies or trying again with more data.
+              Based on your current assets, the AI could not identify any specific new optimization opportunities at this time.
+              This might mean your assets are well-optimized, or more detailed data from different assets could yield other results.
             </p>
           </CardContent>
         </Card>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -10,17 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2 } from 'lucide-react';
 import Image from 'next/image';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { useToast } from "@/hooks/use-toast";
-
-
-interface Asset {
-  id: string;
-  name: string;
-  type: 'bank' | 'stock' | 'crypto' | 'property' | 'mutualfund';
-  value: number;
-  lastUpdated: string;
-}
+import { useAssets } from '@/contexts/AssetContext'; // Import useAssets
+import type { Asset as ContextAsset } from '@/contexts/AssetContext'; // Import Asset type
 
 const assetIcons = {
   bank: <Landmark className="h-8 w-8 text-blue-500" />,
@@ -44,40 +38,43 @@ const chartConfig = {
 
 export default function AssetsPage() {
   const { toast } = useToast();
-  const [assets, setAssets] = useState<Asset[]>([
-    { id: '1', name: 'Savings Account', type: 'bank', value: 15000, lastUpdated: '2024-07-28' },
-    { id: '2', name: 'Tech Stocks', type: 'stock', value: 25000, lastUpdated: '2024-07-28' },
-    { id: '3', name: 'Bitcoin Wallet', type: 'crypto', value: 8000, lastUpdated: '2024-07-27' },
-    { id: '4', name: 'Rental Property', type: 'property', value: 250000, lastUpdated: '2024-07-01' },
-  ]);
+  // Use assets and functions from context
+  const { assets, addAsset, updateAsset, deleteAsset: deleteAssetFromContext } = useAssets();
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [currentAsset, setCurrentAsset] = useState<Partial<Asset> | null>(null);
+  // currentAsset state now uses Partial<ContextAsset>
+  const [currentAsset, setCurrentAsset] = useState<Partial<ContextAsset> | null>(null);
 
-  const openForm = (asset?: Asset) => {
+  const openForm = (asset?: ContextAsset) => {
     setCurrentAsset(asset || { name: '', type: 'bank', value: 0 });
     setIsFormOpen(true);
   };
 
   const handleSaveAsset = () => {
-    if (!currentAsset || !currentAsset.name || !currentAsset.type || currentAsset.value == null) {
-      toast({ title: "Error", description: "Please fill all asset details.", variant: "destructive"});
+    if (!currentAsset || !currentAsset.name || !currentAsset.type || currentAsset.value == null || currentAsset.value < 0) {
+      toast({ title: "Error", description: "Please fill all asset details. Value must be zero or positive.", variant: "destructive"});
       return;
     }
 
     if (currentAsset.id) {
-      setAssets(assets.map(a => a.id === currentAsset!.id ? { ...currentAsset, lastUpdated: new Date().toISOString().split('T')[0] } as Asset : a));
+      // For updating, ensure all required fields of ContextAsset are present
+      updateAsset(currentAsset as ContextAsset); // id is present, lastUpdated will be handled by context
       toast({ title: "Asset Updated", description: `${currentAsset.name} has been updated.`});
     } else {
-      const newAsset = { ...currentAsset, id: Date.now().toString(), lastUpdated: new Date().toISOString().split('T')[0] } as Asset;
-      setAssets([...assets, newAsset]);
-      toast({ title: "Asset Added", description: `${newAsset.name} has been added.`});
+      // For adding, provide Omit<ContextAsset, 'id' | 'lastUpdated'>
+      const newAssetData: Omit<ContextAsset, 'id' | 'lastUpdated'> = {
+        name: currentAsset.name!, // Assert non-null due to prior validation
+        type: currentAsset.type!,
+        value: currentAsset.value!,
+      };
+      addAsset(newAssetData);
+      toast({ title: "Asset Added", description: `${newAssetData.name} has been added.`});
     }
     setIsFormOpen(false);
     setCurrentAsset(null);
   };
 
   const handleDeleteAsset = (id: string) => {
-    setAssets(assets.filter(a => a.id !== id));
+    deleteAssetFromContext(id);
     toast({ title: "Asset Deleted", description: `Asset has been removed.`, variant: "destructive"});
   };
 
@@ -112,7 +109,7 @@ export default function AssetsPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="type" className="text-right">Type</Label>
-                <Select value={currentAsset?.type || 'bank'} onValueChange={(value: Asset['type']) => setCurrentAsset({...currentAsset, type: value})}>
+                <Select value={currentAsset?.type || 'bank'} onValueChange={(value: ContextAsset['type']) => setCurrentAsset({...currentAsset, type: value})}>
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select asset type" />
                   </SelectTrigger>
@@ -127,7 +124,7 @@ export default function AssetsPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="value" className="text-right">Value</Label>
-                <Input id="value" type="number" value={currentAsset?.value || ''} onChange={(e) => setCurrentAsset({...currentAsset, value: parseFloat(e.target.value) || 0 })} className="col-span-3" />
+                <Input id="value" type="number" value={currentAsset?.value === undefined ? '' : currentAsset.value} onChange={(e) => setCurrentAsset({...currentAsset, value: parseFloat(e.target.value) || 0 })} className="col-span-3" />
               </div>
             </div>
             <DialogFooter>
