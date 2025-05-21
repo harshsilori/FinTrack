@@ -8,13 +8,12 @@ import { Lightbulb, Loader2, AlertTriangle, Info } from 'lucide-react';
 import { getSavingsOpportunities, type GetSavingsOpportunitiesOutput } from '@/ai/flows/savings-opportunities';
 import { useToast } from "@/hooks/use-toast";
 import Image from 'next/image';
-import { useAssets } from '@/contexts/AssetContext';
-import type { Asset as ContextAsset } from '@/contexts/AssetContext';
+import { useAssets, type Asset as ContextAsset } from '@/contexts/AssetContext';
 import Link from 'next/link';
 
 export default function AiInsightsPage() {
   const { toast } = useToast();
-  const { assets } = useAssets(); 
+  const { assets, getAssetMarketValue } = useAssets();
   const [opportunities, setOpportunities] = useState<GetSavingsOpportunitiesOutput['opportunities'] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,8 +23,14 @@ export default function AiInsightsPage() {
       return "No assets available.";
     }
     return currentAssets
-      .map(asset => `${asset.name}: $${asset.value.toLocaleString()} (Type: ${asset.type}${asset.type === 'bank' ? '' : ''})`) // Example: Adding APY for bank if available
-      .join(', ');
+      .map(asset => {
+        const marketValue = getAssetMarketValue(asset);
+        let detail = `${asset.name}: $${marketValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} (Category: ${asset.category}`;
+        if (asset.tickerSymbol) detail += `, Ticker: ${asset.tickerSymbol}`;
+        detail += ')';
+        return detail;
+      })
+      .join('; ');
   };
 
   const handleSubmit = async () => {
