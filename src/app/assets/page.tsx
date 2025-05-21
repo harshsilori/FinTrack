@@ -2,13 +2,14 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, FilterX } from 'lucide-react';
 import Image from 'next/image';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -16,7 +17,6 @@ import { Line, LineChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } fro
 import { useToast } from "@/hooks/use-toast";
 import { useAssets, type Asset as ContextAsset, type AssetCategory } from '@/contexts/AssetContext';
 import { fetchAssetPrice } from '@/services/marketService';
-import Link from 'next/link';
 
 const assetIcons: Record<AssetCategory, React.ReactNode> = {
   bank: <Landmark className="h-8 w-8 text-blue-500" />,
@@ -57,23 +57,45 @@ const categoryDisplayNames: Record<AssetCategory, string> = {
   mutualfund: "Mutual Funds",
 };
 
+const assetCategories: AssetCategory[] = ['bank', 'stock', 'crypto', 'property', 'mutualfund'];
+
 
 export default function AssetsPage() {
   const { toast } = useToast();
-  const { assets, addAsset, updateAsset, deleteAsset: deleteAssetFromContext, updateAssetPrice, getAssetMarketValue } = useAssets();
+  const { assets: allAssets, addAsset, updateAsset, deleteAsset: deleteAssetFromContext, updateAssetPrice, getAssetMarketValue } = useAssets();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentAsset, setCurrentAsset] = useState<Partial<ContextAsset>>(initialAssetFormState);
   const [isFetchingPrice, setIsFetchingPrice] = useState<Record<string, boolean>>({});
 
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const categoryFilter = searchParams.get('category') as AssetCategory | null;
+  const activeTab = useMemo(() => {
+    const tab = searchParams.get('category') as AssetCategory | 'overview' | null;
+    if (tab && (assetCategories.includes(tab as AssetCategory) || tab === 'overview')) {
+        return tab;
+    }
+    return 'overview';
+  }, [searchParams]);
+
+
+  const handleTabChange = (newTabValue: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (newTabValue === 'overview') {
+      params.delete('category');
+    } else {
+      params.set('category', newTabValue);
+    }
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
 
   const displayedAssets = useMemo(() => {
-    if (categoryFilter) {
-      return assets.filter(asset => asset.category === categoryFilter);
+    if (activeTab && activeTab !== 'overview') {
+      return allAssets.filter(asset => asset.category === activeTab);
     }
-    return assets;
-  }, [assets, categoryFilter]);
+    return allAssets; // For overview, calculations use allAssets, display handled by specific cards
+  }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
     if (!currentAsset || !currentAsset.category) return false;
@@ -86,7 +108,7 @@ export default function AssetsPage() {
     } else {
       setCurrentAsset({
         name: '',
-        category: categoryFilter || 'stock', // Default to filtered category if present
+        category: (activeTab && activeTab !== 'overview' ? activeTab : 'stock') as AssetCategory,
         currency: 'USD',
         quantity: 1,
         purchasePrice: 0,
@@ -129,7 +151,7 @@ export default function AssetsPage() {
     const isTrackableType = currentAsset.category === 'stock' || currentAsset.category === 'crypto' || currentAsset.category === 'mutualfund';
 
     if (currentAsset.quantity === undefined || currentAsset.quantity <= 0) {
-        if (currentAsset.category !== 'bank' && currentAsset.category !== 'property') { // Quantity matters for trackable
+        if (currentAsset.category !== 'bank' && currentAsset.category !== 'property') { 
             toast({ title: "Error", description: "Quantity must be greater than zero for trackable assets.", variant: "destructive" });
             return;
         }
@@ -196,10 +218,10 @@ export default function AssetsPage() {
   const formatCurrency = (value: number, currencyCode: string) => {
     return value.toLocaleString(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
-
-  const totalsByCurrency = useMemo(() => {
+  
+  const calculateTotals = (assetsToSummarize: ContextAsset[]) => {
     const totals: Record<string, {marketValue: number, dailyGain: number, allTimeGain: number, totalPurchaseCost: number }> = {};
-    displayedAssets.forEach(asset => {
+    assetsToSummarize.forEach(asset => {
       if (!totals[asset.currency]) {
         totals[asset.currency] = { marketValue: 0, dailyGain: 0, allTimeGain: 0, totalPurchaseCost: 0 };
       }
@@ -219,7 +241,15 @@ export default function AssetsPage() {
       }
     });
     return totals;
-  }, [displayedAssets, getAssetMarketValue]);
+  };
+
+  const portfolioTotalsByCurrency = useMemo(() => calculateTotals(allAssets), [allAssets, getAssetMarketValue]);
+  const categoryTotalsByCurrency = useMemo(() => {
+    if (activeTab && activeTab !== 'overview') {
+        return calculateTotals(displayedAssets);
+    }
+    return {};
+  }, [displayedAssets, activeTab, getAssetMarketValue]);
 
 
   const handleCategoryChange = (value: AssetCategory) => {
@@ -240,11 +270,8 @@ export default function AssetsPage() {
     setCurrentAsset(newState);
   };
 
-  const pageTitle = categoryFilter ? `My ${categoryDisplayNames[categoryFilter]}` : "Asset Portfolio";
-  const pageDescription = categoryFilter ? `Details for your ${categoryDisplayNames[categoryFilter].toLowerCase()}.` : "Track your investments and net worth. Price refresh is simulated.";
 
-
-  const AssetCard = ({ asset }: { asset: ContextAsset }) => {
+  const AssetCardComponent = ({ asset }: { asset: ContextAsset }) => {
     const marketValue = getAssetMarketValue(asset);
     const isTrackableAsset = asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund';
 
@@ -368,174 +395,230 @@ export default function AssetsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{pageTitle}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">My Assets</h1>
           <p className="text-muted-foreground">
-            {pageDescription}
+            Track your investments and net worth.
           </p>
         </div>
-        <div className="flex gap-2">
-            {categoryFilter && (
-                 <Link href="/assets" passHref>
-                    <Button variant="outline">
-                        <FilterX className="mr-2 h-4 w-4" /> Clear Filter
-                    </Button>
-                </Link>
-            )}
-            <Dialog open={isFormOpen} onOpenChange={(isOpen) => { setIsFormOpen(isOpen); if (!isOpen) setCurrentAsset(initialAssetFormState);}}>
-            <DialogTrigger asChild>
-                <Button onClick={() => openForm()}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Asset
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[480px]">
-                <DialogHeader>
-                <DialogTitle>{currentAsset?.id ? 'Edit Asset' : `Add New ${categoryFilter ? categoryDisplayNames[categoryFilter].slice(0,-1) : 'Asset'}`}</DialogTitle>
-                <DialogDescription>
-                    Enter the details for your asset. Market data is mocked. For global currency settings, this is planned for a future update.
-                </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
+        <Dialog open={isFormOpen} onOpenChange={(isOpen) => { setIsFormOpen(isOpen); if (!isOpen) setCurrentAsset(initialAssetFormState);}}>
+        <DialogTrigger asChild>
+            <Button onClick={() => openForm()}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Asset
+            </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+            <DialogTitle>{currentAsset?.id ? 'Edit Asset' : `Add New ${activeTab && activeTab !== 'overview' ? categoryDisplayNames[activeTab as AssetCategory].slice(0,-1) : 'Asset'}`}</DialogTitle>
+            <DialogDescription>
+                Enter the details for your asset. Market data is mocked. Global currency settings and auto-conversion are planned for a future update.
+            </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">{currentAssetLabels.name}</Label>
+                <div className="col-span-3">
+                <Input id="name" value={currentAsset?.name || ''} onChange={(e) => setCurrentAsset({...currentAsset, name: e.target.value })} placeholder={`e.g. ${currentAsset?.category === 'bank' ? 'Main Savings' : currentAsset?.category === 'property' ? 'Downtown Condo' : currentAsset?.category === 'stock' ? 'Apple Inc.' : currentAsset?.category === 'crypto' ? 'Bitcoin' : 'Vanguard S&P 500 ETF'}`} />
+                <p className="text-xs text-muted-foreground mt-1">
+                    Dynamic name suggestions are planned for a future update.
+                </p>
+                </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="category" className="text-right">Category</Label>
+                <Select value={currentAsset?.category || 'stock'} onValueChange={handleCategoryChange}>
+                <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select asset category" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="bank">Bank Account</SelectItem>
+                    <SelectItem value="stock">Stocks</SelectItem>
+                    <SelectItem value="crypto">Cryptocurrency</SelectItem>
+                    <SelectItem value="property">Property</SelectItem>
+                    <SelectItem value="mutualfund">Mutual Fund</SelectItem>
+                </SelectContent>
+                </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="currency" className="text-right">Currency</Label>
+                <Select value={currentAsset?.currency || 'USD'} onValueChange={(value) => setCurrentAsset({...currentAsset, currency: value })}>
+                <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                    {supportedCurrencies.map(curr => <SelectItem key={curr.value} value={curr.value}>{curr.label}</SelectItem>)}
+                </SelectContent>
+                </Select>
+            </div>
+            
+            {(currentAsset?.category !== 'bank' && currentAsset?.category !== 'property') && (
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="name" className="text-right">{currentAssetLabels.name}</Label>
+                    <Label htmlFor="quantity" className="text-right">{currentAssetLabels.quantity}</Label>
+                    <Input id="quantity" type="number" value={currentAsset?.quantity === undefined ? '' : currentAsset.quantity} onChange={(e) => setCurrentAsset({...currentAsset, quantity: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder={currentAsset?.category === 'stock' ? 'e.g. 10' : currentAsset?.category === 'crypto' ? 'e.g. 0.5' : 'e.g. 100'}/>
+                </div>
+            )}
+
+            {isCurrentAssetTrackable && (
+                <>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="tickerSymbol" className="text-right">{currentAssetLabels.ticker}</Label>
                     <div className="col-span-3">
-                    <Input id="name" value={currentAsset?.name || ''} onChange={(e) => setCurrentAsset({...currentAsset, name: e.target.value })} placeholder={`e.g. ${currentAsset?.category === 'bank' ? 'Main Savings' : currentAsset?.category === 'property' ? 'Downtown Condo' : 'My Investment'}`} />
+                    <Input id="tickerSymbol" value={currentAsset?.tickerSymbol || ''} onChange={(e) => setCurrentAsset({...currentAsset, tickerSymbol: e.target.value.toUpperCase() })} placeholder={currentAsset?.category === 'stock' ? 'e.g. AAPL' : currentAsset?.category === 'crypto' ? 'e.g. BTCUSD' : 'e.g. VOO'} />
                     <p className="text-xs text-muted-foreground mt-1">
-                        Dynamic name suggestions are planned for a future update.
+                        Automatic ticker fetching from name is planned. For now, please provide the ticker for stocks, crypto, and mutual funds.
                     </p>
                     </div>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="category" className="text-right">Category</Label>
-                    <Select value={currentAsset?.category || 'stock'} onValueChange={handleCategoryChange}>
-                    <SelectTrigger className="col-span-3">
-                        <SelectValue placeholder="Select asset category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="bank">Bank Account</SelectItem>
-                        <SelectItem value="stock">Stocks</SelectItem>
-                        <SelectItem value="crypto">Cryptocurrency</SelectItem>
-                        <SelectItem value="property">Property</SelectItem>
-                        <SelectItem value="mutualfund">Mutual Fund</SelectItem>
-                    </SelectContent>
-                    </Select>
+                    <Label htmlFor="purchasePrice" className="text-right">{currentAssetLabels.purchasePrice}</Label>
+                    <Input id="purchasePrice" type="number" value={currentAsset?.purchasePrice === undefined ? '' : currentAsset.purchasePrice} onChange={(e) => setCurrentAsset({...currentAsset, purchasePrice: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder="Price per unit at purchase" />
                 </div>
+                </>
+            )}
+            {!isCurrentAssetTrackable && (currentAsset?.category === 'bank' || currentAsset?.category === 'property') && (
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="currency" className="text-right">Currency</Label>
-                    <Select value={currentAsset?.currency || 'USD'} onValueChange={(value) => setCurrentAsset({...currentAsset, currency: value })}>
-                    <SelectTrigger className="col-span-3">
-                        <SelectValue placeholder="Select currency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {supportedCurrencies.map(curr => <SelectItem key={curr.value} value={curr.value}>{curr.label}</SelectItem>)}
-                    </SelectContent>
-                    </Select>
+                <Label htmlFor="currentValue" className="text-right">{currentAsset?.category === 'bank' ? 'Current Balance' : 'Current Estimated Value'}</Label>
+                <Input id="currentValue" type="number" value={currentAsset?.currentPrice === undefined ? '' : currentAsset.currentPrice} onChange={(e) => setCurrentAsset({...currentAsset, currentPrice: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder="Total current value" />
                 </div>
-                
-                {(currentAsset?.category !== 'bank' && currentAsset?.category !== 'property') && (
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="quantity" className="text-right">{currentAssetLabels.quantity}</Label>
-                        <Input id="quantity" type="number" value={currentAsset?.quantity === undefined ? '' : currentAsset.quantity} onChange={(e) => setCurrentAsset({...currentAsset, quantity: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder="e.g. 10" />
-                    </div>
-                )}
-
-                {isCurrentAssetTrackable && (
-                    <>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="tickerSymbol" className="text-right">{currentAssetLabels.ticker}</Label>
-                        <div className="col-span-3">
-                        <Input id="tickerSymbol" value={currentAsset?.tickerSymbol || ''} onChange={(e) => setCurrentAsset({...currentAsset, tickerSymbol: e.target.value.toUpperCase() })} placeholder="e.g. AAPL, BTCUSD" />
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Automatic ticker fetching from name is planned. For now, please provide the ticker for stocks, crypto, and mutual funds.
-                        </p>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="purchasePrice" className="text-right">{currentAssetLabels.purchasePrice}</Label>
-                        <Input id="purchasePrice" type="number" value={currentAsset?.purchasePrice === undefined ? '' : currentAsset.purchasePrice} onChange={(e) => setCurrentAsset({...currentAsset, purchasePrice: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder="Price per unit at purchase" />
-                    </div>
-                    </>
-                )}
-                {!isCurrentAssetTrackable && (currentAsset?.category === 'bank' || currentAsset?.category === 'property') && (
-                    <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="currentValue" className="text-right">{currentAsset?.category === 'bank' ? 'Current Balance' : 'Current Estimated Value'}</Label>
-                    <Input id="currentValue" type="number" value={currentAsset?.currentPrice === undefined ? '' : currentAsset.currentPrice} onChange={(e) => setCurrentAsset({...currentAsset, currentPrice: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder="Total current value" />
-                    </div>
-                )}
-                </div>
-                <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); setCurrentAsset(initialAssetFormState);}}>Cancel</Button>
-                <Button type="submit" onClick={handleSaveAsset}>Save Asset</Button>
-                </DialogFooter>
-            </DialogContent>
-            </Dialog>
-        </div>
+            )}
+            </div>
+            <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); setCurrentAsset(initialAssetFormState);}}>Cancel</Button>
+            <Button type="submit" onClick={handleSaveAsset}>Save Asset</Button>
+            </DialogFooter>
+        </DialogContent>
+        </Dialog>
       </div>
       
-      <Card className="rounded-2xl shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle>{categoryFilter ? `${categoryDisplayNames[categoryFilter]} Summary` : "Portfolio Snapshot"}</CardTitle>
-          <Coins className="h-5 w-5 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          {Object.keys(totalsByCurrency).length === 0 && <p className="text-muted-foreground">No assets to display totals for.</p>}
-          {Object.entries(totalsByCurrency).map(([currency, totalData]) => {
-            const allTimeGainLossPercent = totalData.totalPurchaseCost > 0 
-                ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100 
-                : (totalData.allTimeGain !== 0 ? Infinity : 0);
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-4">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            {assetCategories.map(cat => (
+                <TabsTrigger key={cat} value={cat}>{categoryDisplayNames[cat]}</TabsTrigger>
+            ))}
+        </TabsList>
 
-            return (
-                <div key={currency} className="mb-3">
-                <p className="text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
-                    <span className="text-sm text-muted-foreground ml-1">({currency} Total {categoryFilter ? categoryDisplayNames[categoryFilter].toLowerCase() : 'Portfolio'})</span>
-                </p>
-                {(categoryFilter ? (displayedAssets[0]?.category !== 'bank' && displayedAssets[0]?.category !== 'property') : true) && (
-                    <>
-                        {totalData.dailyGain !== undefined && (
-                            <div className="text-sm flex items-center mt-1">
-                            <span className="text-muted-foreground mr-1">Daily Gain/Loss:</span>
-                            <span className={totalData.dailyGain >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                {totalData.dailyGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <TrendingDown className="inline h-4 w-4 mr-1" />}
-                                {totalData.dailyGain >= 0 ? '+' : ''}{formatCurrency(totalData.dailyGain, currency)}
-                            </span>
+        <TabsContent value="overview">
+            <Card className="rounded-2xl shadow-lg">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle>Portfolio Snapshot</CardTitle>
+                    <Coins className="h-5 w-5 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                    {Object.keys(portfolioTotalsByCurrency).length === 0 && <p className="text-muted-foreground">No assets to display totals for. Add assets using the button above.</p>}
+                    {Object.entries(portfolioTotalsByCurrency).map(([currency, totalData]) => {
+                        const allTimeGainLossPercent = totalData.totalPurchaseCost > 0 
+                            ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100 
+                            : (totalData.allTimeGain !== 0 ? Infinity : 0);
+                        return (
+                            <div key={currency} className="mb-3">
+                            <p className="text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
+                                <span className="text-sm text-muted-foreground ml-1">({currency} Total Portfolio)</span>
+                            </p>
+                            {(totalData.dailyGain !== undefined) && (
+                                <div className="text-sm flex items-center mt-1">
+                                <span className="text-muted-foreground mr-1">Daily Gain/Loss:</span>
+                                <span className={totalData.dailyGain >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                    {totalData.dailyGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <TrendingDown className="inline h-4 w-4 mr-1" />}
+                                    {totalData.dailyGain >= 0 ? '+' : ''}{formatCurrency(totalData.dailyGain, currency)}
+                                </span>
+                                </div>
+                            )}
+                            {(totalData.allTimeGain !== undefined) && (
+                                <div className="text-sm flex items-center mt-1">
+                                <span className="text-muted-foreground mr-1">All-Time Gain/Loss:</span>
+                                <span className={totalData.allTimeGain >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                    {totalData.allTimeGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <TrendingDown className="inline h-4 w-4 mr-1" />}
+                                    {totalData.allTimeGain >= 0 ? '+' : ''}{formatCurrency(totalData.allTimeGain, currency)}
+                                    {(allTimeGainLossPercent !== Infinity && allTimeGainLossPercent !== -Infinity && totalData.totalPurchaseCost > 0)
+                                    ? ` (${allTimeGainLossPercent.toFixed(2)}%)`
+                                    : (totalData.totalPurchaseCost === 0 && totalData.allTimeGain !== 0 ? ` (N/A %)` : ` (0.00%)`)}
+                                </span>
+                                </div>
+                            )}
                             </div>
-                        )}
-                        {totalData.allTimeGain !== undefined && (
-                            <div className="text-sm flex items-center mt-1">
-                            <span className="text-muted-foreground mr-1">All-Time Gain/Loss:</span>
-                            <span className={totalData.allTimeGain >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                {totalData.allTimeGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <TrendingDown className="inline h-4 w-4 mr-1" />}
-                                {totalData.allTimeGain >= 0 ? '+' : ''}{formatCurrency(totalData.allTimeGain, currency)}
-                                {(allTimeGainLossPercent !== Infinity && allTimeGainLossPercent !== -Infinity && totalData.totalPurchaseCost > 0)
-                                ? ` (${allTimeGainLossPercent.toFixed(2)}%)`
-                                : (totalData.totalPurchaseCost === 0 && totalData.allTimeGain !== 0 ? ` (N/A %)` : ` (0.00%)`)}
-                            </span>
+                        );
+                    })}
+                </CardContent>
+            </Card>
+             {allAssets.length === 0 && (
+                <Card className="rounded-2xl shadow-lg mt-6">
+                    <CardContent className="pt-6 text-center text-muted-foreground">
+                        <WalletCards className="mx-auto h-12 w-12 mb-4" />
+                        <p className="text-lg font-semibold">No assets yet!</p>
+                        <p>Click "Add Asset" to start building your portfolio.</p>
+                    </CardContent>
+                </Card>
+            )}
+        </TabsContent>
+
+        {assetCategories.map(category => (
+            <TabsContent key={category} value={category}>
+                <Card className="rounded-2xl shadow-lg mb-6">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle>{categoryDisplayNames[category]} Summary</CardTitle>
+                    <Coins className="h-5 w-5 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                    {Object.keys(categoryTotalsByCurrency).length === 0 && <p className="text-muted-foreground">No assets in this category.</p>}
+                    {Object.entries(categoryTotalsByCurrency).map(([currency, totalData]) => {
+                        const allTimeGainLossPercent = totalData.totalPurchaseCost > 0 
+                            ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100 
+                            : (totalData.allTimeGain !== 0 ? Infinity : 0);
+                        const isTrackableCategory = category === 'stock' || category === 'crypto' || category === 'mutualfund';
+                        return (
+                            <div key={currency} className="mb-3">
+                            <p className="text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
+                                <span className="text-sm text-muted-foreground ml-1">({currency} Total {categoryDisplayNames[category].toLowerCase()})</span>
+                            </p>
+                            {isTrackableCategory && (
+                                <>
+                                    {(totalData.dailyGain !== undefined) && (
+                                        <div className="text-sm flex items-center mt-1">
+                                        <span className="text-muted-foreground mr-1">Daily Gain/Loss:</span>
+                                        <span className={totalData.dailyGain >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                            {totalData.dailyGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <TrendingDown className="inline h-4 w-4 mr-1" />}
+                                            {totalData.dailyGain >= 0 ? '+' : ''}{formatCurrency(totalData.dailyGain, currency)}
+                                        </span>
+                                        </div>
+                                    )}
+                                    {(totalData.allTimeGain !== undefined) && (
+                                        <div className="text-sm flex items-center mt-1">
+                                        <span className="text-muted-foreground mr-1">All-Time Gain/Loss:</span>
+                                        <span className={totalData.allTimeGain >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                            {totalData.allTimeGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <TrendingDown className="inline h-4 w-4 mr-1" />}
+                                            {totalData.allTimeGain >= 0 ? '+' : ''}{formatCurrency(totalData.allTimeGain, currency)}
+                                            {(allTimeGainLossPercent !== Infinity && allTimeGainLossPercent !== -Infinity && totalData.totalPurchaseCost > 0)
+                                            ? ` (${allTimeGainLossPercent.toFixed(2)}%)`
+                                            : (totalData.totalPurchaseCost === 0 && totalData.allTimeGain !== 0 ? ` (N/A %)` : ` (0.00%)`)}
+                                        </span>
+                                        </div>
+                                    )}
+                                </>
+                            )}
                             </div>
-                        )}
-                    </>
+                        );
+                    })}
+                    </CardContent>
+                </Card>
+
+                {displayedAssets.length === 0 && activeTab === category && (
+                    <Card className="rounded-2xl shadow-lg">
+                        <CardContent className="pt-6 text-center text-muted-foreground">
+                            <WalletCards className="mx-auto h-12 w-12 mb-4" />
+                            <p className="text-lg font-semibold">No assets in {categoryDisplayNames[category].toLowerCase()} yet!</p>
+                            <p>Add one using the "Add Asset" button above.</p>
+                        </CardContent>
+                    </Card>
                 )}
+
+                <div className="grid gap-6 md:grid-cols-1"> {/* Single column for list view in tabs */}
+                    {displayedAssets.map((asset) => (
+                        <AssetCardComponent key={asset.id} asset={asset} />
+                    ))}
                 </div>
-            );
-          })}
-        </CardContent>
-      </Card>
-
-      {displayedAssets.length === 0 && (
-        <Card className="rounded-2xl shadow-lg">
-            <CardContent className="pt-6 text-center text-muted-foreground">
-                <WalletCards className="mx-auto h-12 w-12 mb-4" />
-                <p className="text-lg font-semibold">{categoryFilter ? `No assets in ${categoryDisplayNames[categoryFilter].toLowerCase()} yet!` : "No assets yet!"}</p>
-                <p>{categoryFilter ? "Add one using the button above." : "Click \"Add Asset\" to start building your portfolio."}</p>
-            </CardContent>
-        </Card>
-      )}
-
-      <div className={`grid gap-6 md:grid-cols-1 ${categoryFilter ? '' : 'lg:grid-cols-2 xl:grid-cols-2'}`}>
-        {displayedAssets.map((asset) => (
-          <AssetCard key={asset.id} asset={asset} />
+            </TabsContent>
         ))}
-      </div>
+      </Tabs>
     </div>
   );
 }
-
-    
