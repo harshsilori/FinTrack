@@ -1,7 +1,7 @@
 
 'use client';
 
-import React from 'react'; // Added missing React import
+import React from 'react';
 import type { AssetCategory } from "@/contexts/AssetContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -75,9 +75,10 @@ export default function HomePage() {
       const categoryData = currencySummary[cat];
       if (categoryData && categoryData.totalPurchaseCost && categoryData.totalPurchaseCost > 0) {
         categoryData.gainLossPercent = (categoryData.gainLossAmount! / categoryData.totalPurchaseCost) * 100;
-      } else if (categoryData && categoryData.totalPurchaseCost === 0 && categoryData.gainLossAmount !== 0) {
-        // Handle case with gains but no cost (e.g. airdrops, though not explicitly modeled yet)
+      } else if (categoryData && categoryData.totalPurchaseCost === 0 && categoryData.gainLossAmount && categoryData.gainLossAmount !== 0) {
         categoryData.gainLossPercent = categoryData.gainLossAmount! > 0 ? Infinity : -Infinity; 
+      } else {
+        categoryData.gainLossPercent = 0; // Default to 0 if no cost or no gain/loss
       }
     });
   });
@@ -101,7 +102,7 @@ export default function HomePage() {
         </Link>
       </div>
 
-      {Object.keys(portfolioTotalsByCurrency).length > 0 && (
+      {Object.keys(portfolioTotalsByCurrency).length > 0 ? (
         <Card className="rounded-2xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-lg sm:text-xl">Total Net Worth</CardTitle>
@@ -116,10 +117,8 @@ export default function HomePage() {
             ))}
           </CardContent>
         </Card>
-      )}
-      
-      {assets.length === 0 && (
-         <Card className="rounded-2xl shadow-lg col-span-1 md:col-span-2">
+      ) : (
+         <Card className="rounded-2xl shadow-lg col-span-1 md:col-span-2 lg:col-span-3">
             <CardContent className="pt-6 text-center text-muted-foreground">
                 <WalletCards className="mx-auto h-12 w-12 mb-4 text-primary" />
                 <p className="text-lg font-semibold">Welcome to FinTrack!</p>
@@ -163,14 +162,16 @@ export default function HomePage() {
                       <p className={`text-xs mt-1 ${summary.gainLossAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {summary.gainLossAmount >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1"/> : <TrendingDown className="inline h-4 w-4 mr-1"/>}
                         {formatCurrency(summary.gainLossAmount, currency)}
-                        {summary.gainLossPercent !== undefined && summary.gainLossPercent !== Infinity && summary.gainLossPercent !== -Infinity && ` (${summary.gainLossPercent.toFixed(2)}%)`}
+                        {(summary.gainLossPercent !== undefined && summary.gainLossPercent !== Infinity && summary.gainLossPercent !== -Infinity && summary.totalPurchaseCost > 0) 
+                          ? ` (${summary.gainLossPercent.toFixed(2)}%)`
+                          : (summary.totalPurchaseCost === 0 && summary.gainLossAmount !== 0 ? ` (N/A %)` : ` (0.00%)`)}
                         <span className="text-muted-foreground text-xs"> all-time</span>
                       </p>
                     )}
                      <p className="text-xs text-muted-foreground mt-1">{summary.assetCount} asset(s)</p>
                   </CardContent>
                   <CardFooter>
-                    <Link href="/assets" className="w-full">
+                    <Link href={`/assets?category=${category}`} className="w-full">
                       <Button variant="outline" className="w-full text-xs sm:text-sm">
                         View All {category.charAt(0).toUpperCase() + category.slice(1)}
                       </Button>
@@ -220,4 +221,3 @@ export default function HomePage() {
     </div>
   );
 }
-
