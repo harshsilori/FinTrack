@@ -74,7 +74,7 @@ export default function AssetsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  
+
   const activeTab = useMemo(() => {
     const tabParam = searchParams.get('category') as AssetCategory | 'overview' | null;
     if (tabParam && (assetCategories.includes(tabParam as AssetCategory) || tabParam === 'overview')) {
@@ -98,7 +98,7 @@ export default function AssetsPage() {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return []; 
+    return [];
   }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
@@ -117,13 +117,13 @@ export default function AssetsPage() {
         currency: 'USD',
         quantity: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? 1 : 1,
         purchasePrice: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? undefined : 0,
-        currentPrice: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? 0 : undefined,
+        currentPrice: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? 0 : undefined, // Set initial value if bank/property
         tickerSymbol: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? undefined : '',
       });
     }
     setIsFormOpen(true);
   };
-  
+
   const handleRefreshPrice = useCallback(async (asset: ContextAsset) => {
     if (asset.category === 'bank' || asset.category === 'property') {
       toast({ title: "Manual Update", description: `${asset.name} value is updated manually or via statements.`, variant: "default" });
@@ -148,60 +148,51 @@ export default function AssetsPage() {
   }, [toast, updateAssetPrice]);
 
 
-  useEffect(() => {
+ useEffect(() => {
     const performInitialTabRefresh = async () => {
-      if (activeTab === 'overview' || !activeTab) {
-        return; 
-      }
-
-      if (initialRefreshPerformedForTab[activeTab]) {
-        // console.log(`Initial refresh already done for tab: ${activeTab}, skipping.`);
+      if (activeTab === 'overview' || !activeTab || initialRefreshPerformedForTab[activeTab]) {
         return;
       }
 
-      // console.log(`Performing initial refresh for tab: ${activeTab}`);
-      
       const assetsInTabToRefresh = allAssets.filter(asset =>
         asset.category === activeTab &&
         (asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund') &&
-        asset.tickerSymbol
+        asset.tickerSymbol &&
+        !isFetchingPrice[asset.id] &&
+        (!asset.lastPriceUpdate || (new Date().getTime() - new Date(asset.lastPriceUpdate).getTime() > STALE_PRICE_THRESHOLD_MS))
       );
-
-      // Mark that we are attempting the initial refresh for this tab
-      setInitialRefreshPerformedForTab(prev => ({ ...prev, [activeTab]: true }));
 
       if (assetsInTabToRefresh.length > 0) {
         for (const asset of assetsInTabToRefresh) {
-          // handleRefreshPrice already checks if it's fetching and handles staleness internally if desired.
-          // For "refresh once on tab load", we typically want to try fetching.
-          // Staleness check within handleRefreshPrice might still skip if too recent.
-          await handleRefreshPrice(asset); 
+          await handleRefreshPrice(asset);
           await new Promise(resolve => setTimeout(resolve, 500)); // Stagger API calls
         }
       }
+      setInitialRefreshPerformedForTab(prev => ({ ...prev, [activeTab]: true }));
     };
 
-    if (allAssets.length > 0) { // Only run if there are assets to potentially refresh
+    if (allAssets.length > 0) {
       performInitialTabRefresh();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, allAssets, handleRefreshPrice]); // Removed initialRefreshPerformedForTab from deps
+  }, [activeTab, allAssets, handleRefreshPrice]);
+
 
   const handleSaveAsset = () => {
     if (!currentAsset || !currentAsset.name || !currentAsset.category || !currentAsset.currency) {
       toast({ title: "Error", description: "Please fill name, category, and currency.", variant: "destructive" });
       return;
     }
-    
+
     const isTrackableCategory = currentAsset.category === 'stock' || currentAsset.category === 'crypto' || currentAsset.category === 'mutualfund';
 
     if (currentAsset.quantity === undefined || currentAsset.quantity <= 0) {
-        if (currentAsset.category !== 'bank' && currentAsset.category !== 'property') { 
+        if (currentAsset.category !== 'bank' && currentAsset.category !== 'property') {
             toast({ title: "Error", description: "Quantity must be greater than zero for trackable assets.", variant: "destructive" });
             return;
         }
     }
-    
+
     const quantityToSave = (currentAsset.category === 'bank' || currentAsset.category === 'property') ? 1 : (Number(currentAsset.quantity) || 0);
 
     if (isTrackableCategory) {
@@ -220,8 +211,9 @@ export default function AssetsPage() {
         }
     }
 
-    let newAssetId: string | undefined = undefined;
-    if (currentAsset.id) { 
+    let addedAssetWithId: ContextAsset | undefined = undefined;
+
+    if (currentAsset.id) {
       const payloadForUpdate: Partial<ContextAsset> & { id: string } = {
         id: currentAsset.id,
         name: currentAsset.name!,
@@ -232,38 +224,30 @@ export default function AssetsPage() {
       if (isTrackableCategory) {
         payloadForUpdate.tickerSymbol = currentAsset.tickerSymbol;
         payloadForUpdate.purchasePrice = Number(currentAsset.purchasePrice) || 0;
-      } else { 
+      } else {
         payloadForUpdate.currentPrice = Number(currentAsset.currentPrice) || 0;
       }
       updateAsset(payloadForUpdate);
       toast({ title: "Asset Updated", description: `${payloadForUpdate.name} has been updated.` });
-    } else { 
+    } else {
       const newAssetPayload: Omit<ContextAsset, 'id' | 'lastUpdated' | 'lastPriceUpdate' | 'priceHistory'> = {
         name: currentAsset.name!,
         category: currentAsset.category!,
         currency: currentAsset.currency!,
         quantity: quantityToSave,
         purchasePrice: isTrackableCategory ? (Number(currentAsset.purchasePrice) || 0) : undefined,
-        // For new trackable assets, initial currentPrice is purchasePrice, to be updated by fetch
         currentPrice: isTrackableCategory ? (Number(currentAsset.purchasePrice) || 0) : (Number(currentAsset.currentPrice) || 0),
         tickerSymbol: isTrackableCategory ? currentAsset.tickerSymbol : undefined,
-        // For new trackable assets, initial prevClose is also purchasePrice
-        previousClosePrice: isTrackableCategory ? (Number(currentAsset.purchasePrice) || 0) : undefined, 
+        previousClosePrice: isTrackableCategory ? (Number(currentAsset.purchasePrice) || 0) : undefined,
       };
-      const addedAsset = addAsset(newAssetPayload); // Assuming addAsset returns the full new asset with ID
-      newAssetId = addedAsset.id; // Capture new asset ID
+      addedAssetWithId = addAsset(newAssetPayload); // Capture the returned asset
       toast({ title: "Asset Added", description: `${newAssetPayload.name} has been added.` });
     }
     setIsFormOpen(false);
     setCurrentAsset(initialAssetFormState);
 
-    // If a new trackable asset was added, immediately try to fetch its price
-    if (newAssetId && isTrackableCategory && currentAsset.tickerSymbol) {
-        const newlyAddedAsset = allAssets.find(a => a.id === newAssetId);
-        if (newlyAddedAsset) {
-            // console.log("Attempting initial fetch for newly added asset:", newlyAddedAsset.name);
-            handleRefreshPrice(newlyAddedAsset);
-        }
+    if (addedAssetWithId && isTrackableCategory && addedAssetWithId.tickerSymbol) {
+        handleRefreshPrice(addedAssetWithId);
     }
   };
 
@@ -276,7 +260,7 @@ export default function AssetsPage() {
     if (value === undefined) return 'N/A';
     return value.toLocaleString(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
-  
+
   const calculateTotals = useCallback((assetsToSummarize: ContextAsset[]) => {
     const totals: Record<string, {marketValue: number, dailyGain: number, allTimeGain: number, totalPurchaseCost: number }> = {};
     assetsToSummarize.forEach(asset => {
@@ -302,7 +286,7 @@ export default function AssetsPage() {
   }, [getAssetMarketValue]);
 
   const portfolioTotalsByCurrency = useMemo(() => calculateTotals(allAssets), [allAssets, calculateTotals]);
-  
+
   const categorySpecificTotals = useMemo(() => {
     if (activeTab && activeTab !== 'overview') {
       const filteredAssetsForTab = allAssets.filter(asset => asset.category === activeTab);
@@ -319,14 +303,13 @@ export default function AssetsPage() {
     if (isNewCategoryTrackable) {
         newState.tickerSymbol = currentAsset?.tickerSymbol || '';
         newState.purchasePrice = currentAsset?.purchasePrice === undefined ? 0 : currentAsset.purchasePrice;
-        newState.quantity = currentAsset?.quantity === undefined || currentAsset.quantity === 1 ? 1 : currentAsset.quantity; // Default to 1 for trackable if it was bank/prop
+        newState.quantity = currentAsset?.quantity === undefined || currentAsset.quantity === 1 ? 1 : currentAsset.quantity;
         if (currentAsset?.category === 'bank' || currentAsset?.category === 'property') {
-          // If switching from non-trackable to trackable, might need to clear currentPrice if it was used for value
           delete newState.currentPrice;
         }
-    } else { // Bank or Property
+    } else {
         newState.currentPrice = currentAsset?.currentPrice === undefined ? 0 : currentAsset.currentPrice;
-        newState.quantity = 1; 
+        newState.quantity = 1;
         delete newState.tickerSymbol;
         delete newState.purchasePrice;
     }
@@ -356,7 +339,7 @@ export default function AssetsPage() {
          allTimeGainLossPercent = allTimeGainLoss > 0 ? Infinity : -Infinity;
        }
     }
-    
+
     return (
       <Card className="rounded-2xl shadow-lg flex flex-col">
         <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -455,7 +438,7 @@ export default function AssetsPage() {
     bank: { name: "Account Nickname", quantity: "N/A", purchasePrice: "N/A", ticker: "N/A" },
     property: { name: "Property Name", quantity: "N/A", purchasePrice: "N/A", ticker: "N/A" },
   };
-  
+
   const currentAssetLabels = assetLabelMap[currentAsset?.category || 'stock'];
 
 
@@ -514,7 +497,7 @@ export default function AssetsPage() {
                 </SelectContent>
                 </Select>
             </div>
-            
+
             {(currentAsset?.category !== 'bank' && currentAsset?.category !== 'property') && (
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="quantity" className="text-right">{currentAssetLabels.quantity}</Label>
@@ -553,7 +536,7 @@ export default function AssetsPage() {
         </DialogContent>
         </Dialog>
       </div>
-      
+
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-4">
             <TabsTrigger value="overview">{categoryDisplayNames['overview']}</TabsTrigger>
@@ -571,8 +554,8 @@ export default function AssetsPage() {
                 <CardContent>
                     {Object.keys(portfolioTotalsByCurrency).length === 0 && <p className="text-muted-foreground">No assets to display totals for. Add some assets to get started.</p>}
                     {Object.entries(portfolioTotalsByCurrency).map(([currency, totalData]) => {
-                        const allTimeGainLossPercent = totalData.totalPurchaseCost > 0 
-                            ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100 
+                        const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
+                            ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100
                             : (totalData.allTimeGain !== 0 ? Infinity : 0);
                         return (
                             <div key={currency} className="mb-3">
@@ -588,7 +571,7 @@ export default function AssetsPage() {
                                 </span>
                                 </div>
                             )}
-                            {(totalData.allTimeGain !== 0) && ( 
+                            {(totalData.allTimeGain !== 0) && (
                                 <div className="text-sm flex items-center mt-1">
                                 <span className="text-muted-foreground mr-1">All-Time Gain/Loss:</span>
                                 <span className={totalData.allTimeGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
@@ -631,13 +614,13 @@ export default function AssetsPage() {
                     <CardContent>
                     {Object.keys(categorySpecificTotals).length === 0 && allAssets.filter(a => a.category === category).length === 0 && <p className="text-muted-foreground">No assets in this category. Add one using the "Add Asset" button.</p>}
                     {Object.entries(categorySpecificTotals).map(([currency, totalData]) => {
-                        const allTimeGainLossPercent = totalData.totalPurchaseCost > 0 
-                            ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100 
+                        const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
+                            ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100
                             : (totalData.allTimeGain !== 0 ? Infinity : 0);
                         const isTrackableCategory = category === 'stock' || category === 'crypto' || category === 'mutualfund';
-                        
+
                         const assetsInThisCurrencyAndCategory = allAssets.filter(a => a.category === category && a.currency === currency);
-                        if (assetsInThisCurrencyAndCategory.length === 0 && totalData.marketValue === 0) { // Only render currency block if there are assets or market value
+                        if (assetsInThisCurrencyAndCategory.length === 0 && totalData.marketValue === 0) {
                             return null;
                         }
 
@@ -648,7 +631,7 @@ export default function AssetsPage() {
                             </p>
                             {isTrackableCategory && (
                                 <>
-                                    {(totalData.dailyGain !== 0) && ( 
+                                    {(totalData.dailyGain !== 0) && (
                                         <div className="text-sm flex items-center mt-1">
                                         <span className="text-muted-foreground mr-1">Daily Gain/Loss:</span>
                                         <span className={totalData.dailyGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
@@ -690,7 +673,7 @@ export default function AssetsPage() {
                     </Card>
                 )}
 
-                <div className="grid gap-6 md:grid-cols-1"> {/* Single column for list view in tabs */}
+                <div className="grid gap-6 md:grid-cols-1">
                     {displayedAssets.map((asset) => (
                         <AssetCardComponent key={asset.id} asset={asset} />
                     ))}
