@@ -10,13 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, FilterX } from 'lucide-react';
+import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins } from 'lucide-react';
 import Image from 'next/image';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { useToast } from "@/hooks/use-toast";
 import { useAssets, type Asset as ContextAsset, type AssetCategory } from '@/contexts/AssetContext';
 import { fetchAssetPrice } from '@/services/marketService';
+import Link from 'next/link';
 
 const assetIcons: Record<AssetCategory, React.ReactNode> = {
   bank: <Landmark className="h-8 w-8 text-blue-500" />,
@@ -74,11 +75,10 @@ export default function AssetsPage() {
   
   const activeTab = useMemo(() => {
     const tab = searchParams.get('category') as AssetCategory | 'overview' | null;
-    if (tab === 'overview' || !tab) return 'overview'; // Default to overview
-    if (assetCategories.includes(tab as AssetCategory)) {
+    if (tab && assetCategories.includes(tab as AssetCategory)) {
         return tab;
     }
-    return 'overview'; // Fallback for unknown category
+    return 'overview'; // Default to overview
   }, [searchParams]);
 
 
@@ -96,9 +96,7 @@ export default function AssetsPage() {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    // For overview tab, no individual assets are listed directly under it.
-    // Individual assets are shown when a specific category tab is selected.
-    return []; 
+    return []; // No individual assets shown on overview tab itself
   }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
@@ -110,7 +108,6 @@ export default function AssetsPage() {
     if (asset) {
       setCurrentAsset({ ...asset });
     } else {
-      // If adding new asset from a specific category tab, prefill that category
       const prefilledCategory = (activeTab && activeTab !== 'overview') ? activeTab : 'stock';
       setCurrentAsset({
         name: '',
@@ -150,35 +147,39 @@ export default function AssetsPage() {
 
 
   useEffect(() => {
-    const autoRefreshStaleAssets = async () => {
-      // console.log("Checking for stale assets to auto-refresh...");
-      for (const asset of allAssets) {
-        if (asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund') {
-          if (!asset.tickerSymbol) continue;
+    const autoRefreshCategoryAssets = async () => {
+      if (activeTab === 'overview' || !activeTab) {
+        return; // Don't auto-refresh on overview tab
+      }
 
-          let isStale = true;
-          if (asset.lastPriceUpdate) {
-            const lastUpdateDate = new Date(asset.lastPriceUpdate);
-            if (Date.now() - lastUpdateDate.getTime() < STALE_PRICE_THRESHOLD_MS) {
-              isStale = false;
-            }
+      const assetsToRefresh = allAssets.filter(asset => 
+        asset.category === activeTab &&
+        (asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund') &&
+        asset.tickerSymbol
+      );
+
+      for (const asset of assetsToRefresh) {
+        let isStale = true;
+        if (asset.lastPriceUpdate) {
+          const lastUpdateDate = new Date(asset.lastPriceUpdate);
+          if (Date.now() - lastUpdateDate.getTime() < STALE_PRICE_THRESHOLD_MS) {
+            isStale = false;
           }
-          
-          if (isStale && !isFetchingPrice[asset.id]) { // Also check if not already fetching
-            // console.log(`Auto-refreshing price for stale asset: ${asset.name}`);
-            await handleRefreshPrice(asset);
-            // Small delay to avoid overwhelming APIs if many assets are stale
-            await new Promise(resolve => setTimeout(resolve, 500)); 
-          }
+        }
+        
+        if (isStale && !isFetchingPrice[asset.id]) {
+          // console.log(`Auto-refreshing price for stale asset in active tab ${activeTab}: ${asset.name}`);
+          await handleRefreshPrice(asset);
+          await new Promise(resolve => setTimeout(resolve, 500)); // Stagger API calls
         }
       }
     };
 
     if (allAssets.length > 0) {
-        autoRefreshStaleAssets();
+        autoRefreshCategoryAssets();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allAssets, handleRefreshPrice]); // Rerun if assets change or refresh function changes
+  }, [activeTab, allAssets, handleRefreshPrice]);
 
   const handleSaveAsset = () => {
     if (!currentAsset || !currentAsset.name || !currentAsset.category || !currentAsset.currency) {
@@ -196,7 +197,6 @@ export default function AssetsPage() {
     }
     
     const quantityToSave = (currentAsset.category === 'bank' || currentAsset.category === 'property') ? 1 : (Number(currentAsset.quantity) || 0);
-
 
     if (isTrackableType) {
         if (!currentAsset.tickerSymbol) {
@@ -237,11 +237,8 @@ export default function AssetsPage() {
         currency: currentAsset.currency!,
         quantity: quantityToSave,
         purchasePrice: isTrackableType ? (Number(currentAsset.purchasePrice) || 0) : undefined,
-        // For new trackable assets, initial current price is set to purchase price. It will be updated on first fetch.
-        // For bank/property, currentPrice is user-input.
         currentPrice: isTrackableType ? (Number(currentAsset.purchasePrice) || 0) : (Number(currentAsset.currentPrice) || 0),
         tickerSymbol: isTrackableType ? currentAsset.tickerSymbol : undefined,
-        // previousClosePrice will be set by first fetch for trackable assets
         previousClosePrice: isTrackableType ? (Number(currentAsset.purchasePrice) || 0) : undefined, 
       };
       addAsset(newAssetPayload);
@@ -256,7 +253,8 @@ export default function AssetsPage() {
     toast({ title: "Asset Deleted", description: `Asset has been removed.`, variant: "destructive" });
   };
 
-  const formatCurrency = (value: number, currencyCode: string) => {
+  const formatCurrency = (value: number | undefined, currencyCode: string) => {
+    if (value === undefined) return 'N/A';
     return value.toLocaleString(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
   
@@ -364,14 +362,14 @@ export default function AssetsPage() {
                 <span className="font-medium">Daily: </span>
                 <span className={dailyGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}>
                   {dailyGainLoss >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1"/> : <TrendingDown className="inline h-4 w-4 mr-1"/>}
-                  {dailyGainLoss >= 0 ? '+' : ''}{formatCurrency(dailyGainLoss, asset.currency)} ({dailyGainLossPercent.toFixed(2)}%)
+                  {dailyGainLoss >= 0 ? '+' : ''}{formatCurrency(dailyGainLoss, asset.currency)} ({!isNaN(dailyGainLossPercent) && isFinite(dailyGainLossPercent) ? dailyGainLossPercent.toFixed(2) : '0.00'}%)
                 </span>
               </div>
               <div className="text-sm">
                 <span className="font-medium">All-Time: </span>
                 <span className={allTimeGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}>
                   {allTimeGainLoss >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1"/> : <TrendingDown className="inline h-4 w-4 mr-1"/>}
-                  {allTimeGainLoss >= 0 ? '+' : ''}{formatCurrency(allTimeGainLoss, asset.currency)} ({allTimeGainLossPercent.toFixed(2)}%)
+                  {allTimeGainLoss >= 0 ? '+' : ''}{formatCurrency(allTimeGainLoss, asset.currency)} ({!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent) ? allTimeGainLossPercent.toFixed(2) : '0.00'}%)
                 </span>
               </div>
                {asset.purchasePrice !== undefined && (
@@ -474,11 +472,7 @@ export default function AssetsPage() {
                     <SelectValue placeholder="Select asset category" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="bank">Bank Account</SelectItem>
-                    <SelectItem value="stock">Stocks</SelectItem>
-                    <SelectItem value="crypto">Cryptocurrency</SelectItem>
-                    <SelectItem value="property">Property</SelectItem>
-                    <SelectItem value="mutualfund">Mutual Fund</SelectItem>
+                    {assetCategories.map(cat => <SelectItem key={cat} value={cat}>{categoryDisplayNames[cat]}</SelectItem>)}
                 </SelectContent>
                 </Select>
             </div>
@@ -548,7 +542,7 @@ export default function AssetsPage() {
                     <Coins className="h-5 w-5 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                    {Object.keys(portfolioTotalsByCurrency).length === 0 && <p className="text-muted-foreground">No assets to display totals for. Add assets using the button above.</p>}
+                    {Object.keys(portfolioTotalsByCurrency).length === 0 && <p className="text-muted-foreground">No assets to display totals for. Add some assets to get started.</p>}
                     {Object.entries(portfolioTotalsByCurrency).map(([currency, totalData]) => {
                         const allTimeGainLossPercent = totalData.totalPurchaseCost > 0 
                             ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100 
@@ -558,7 +552,7 @@ export default function AssetsPage() {
                             <p className="text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
                                 <span className="text-sm text-muted-foreground ml-1">({currency} Total Portfolio)</span>
                             </p>
-                            {(totalData.dailyGain !== 0) && ( // Only show if non-zero
+                            {(totalData.dailyGain !== 0) && (
                                 <div className="text-sm flex items-center mt-1">
                                 <span className="text-muted-foreground mr-1">Daily Gain/Loss:</span>
                                 <span className={totalData.dailyGain >= 0 ? 'text-green-600' : 'text-red-600'}>
@@ -567,13 +561,13 @@ export default function AssetsPage() {
                                 </span>
                                 </div>
                             )}
-                            {(totalData.allTimeGain !== 0) && ( // Only show if non-zero
+                            {(totalData.allTimeGain !== 0) && ( 
                                 <div className="text-sm flex items-center mt-1">
                                 <span className="text-muted-foreground mr-1">All-Time Gain/Loss:</span>
                                 <span className={totalData.allTimeGain >= 0 ? 'text-green-600' : 'text-red-600'}>
                                     {totalData.allTimeGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <TrendingDown className="inline h-4 w-4 mr-1" />}
                                     {totalData.allTimeGain >= 0 ? '+' : ''}{formatCurrency(totalData.allTimeGain, currency)}
-                                    {(allTimeGainLossPercent !== Infinity && allTimeGainLossPercent !== -Infinity && totalData.totalPurchaseCost > 0)
+                                    {(!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent))
                                     ? ` (${allTimeGainLossPercent.toFixed(2)}%)`
                                     : (totalData.totalPurchaseCost === 0 && totalData.allTimeGain !== 0 ? ` (N/A %)` : ` (0.00%)`)}
                                 </span>
@@ -583,16 +577,16 @@ export default function AssetsPage() {
                         );
                     })}
                 </CardContent>
-            </Card>
-             {allAssets.length === 0 && (
-                <Card className="rounded-2xl shadow-lg mt-6">
-                    <CardContent className="pt-6 text-center text-muted-foreground">
-                        <WalletCards className="mx-auto h-12 w-12 mb-4" />
-                        <p className="text-lg font-semibold">No assets yet!</p>
-                        <p>Click "Add Asset" to start building your portfolio.</p>
+                 {allAssets.length === 0 && (
+                    <CardContent className="pt-0"> {/* Adjusted pt-0 if no totals and this is the first thing */}
+                        <div className="text-center text-muted-foreground py-4">
+                            <WalletCards className="mx-auto h-12 w-12 mb-4 text-primary" />
+                            <p className="text-lg font-semibold">No assets yet!</p>
+                            <p>Click "Add Asset" above to start building your portfolio.</p>
+                        </div>
                     </CardContent>
-                </Card>
-            )}
+                )}
+            </Card>
         </TabsContent>
 
         {assetCategories.map(category => (
@@ -603,12 +597,18 @@ export default function AssetsPage() {
                     <Coins className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                    {Object.keys(categorySpecificTotals).length === 0 && <p className="text-muted-foreground">No assets in this category. Add one using the button above.</p>}
+                    {Object.keys(categorySpecificTotals).length === 0 && allAssets.filter(a => a.category === category).length === 0 && <p className="text-muted-foreground">No assets in this category. Add one using the "Add Asset" button.</p>}
                     {Object.entries(categorySpecificTotals).map(([currency, totalData]) => {
                         const allTimeGainLossPercent = totalData.totalPurchaseCost > 0 
                             ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100 
                             : (totalData.allTimeGain !== 0 ? Infinity : 0);
                         const isTrackableCategory = category === 'stock' || category === 'crypto' || category === 'mutualfund';
+                        
+                        // Only render this currency block if there's market value for this category in this currency
+                        if (totalData.marketValue === 0 && allAssets.filter(a => a.category === category && a.currency === currency).length === 0) {
+                            return null;
+                        }
+
                         return (
                             <div key={currency} className="mb-3">
                             <p className="text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
@@ -616,7 +616,7 @@ export default function AssetsPage() {
                             </p>
                             {isTrackableCategory && (
                                 <>
-                                    {(totalData.dailyGain !== 0) && ( // Only show if non-zero
+                                    {(totalData.dailyGain !== 0) && ( 
                                         <div className="text-sm flex items-center mt-1">
                                         <span className="text-muted-foreground mr-1">Daily Gain/Loss:</span>
                                         <span className={totalData.dailyGain >= 0 ? 'text-green-600' : 'text-red-600'}>
@@ -625,13 +625,13 @@ export default function AssetsPage() {
                                         </span>
                                         </div>
                                     )}
-                                    {(totalData.allTimeGain !== 0) && ( // Only show if non-zero
+                                    {(totalData.allTimeGain !== 0) && (
                                         <div className="text-sm flex items-center mt-1">
                                         <span className="text-muted-foreground mr-1">All-Time Gain/Loss:</span>
                                         <span className={totalData.allTimeGain >= 0 ? 'text-green-600' : 'text-red-600'}>
                                             {totalData.allTimeGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <TrendingDown className="inline h-4 w-4 mr-1" />}
                                             {totalData.allTimeGain >= 0 ? '+' : ''}{formatCurrency(totalData.allTimeGain, currency)}
-                                            {(allTimeGainLossPercent !== Infinity && allTimeGainLossPercent !== -Infinity && totalData.totalPurchaseCost > 0)
+                                            {(!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent))
                                             ? ` (${allTimeGainLossPercent.toFixed(2)}%)`
                                             : (totalData.totalPurchaseCost === 0 && totalData.allTimeGain !== 0 ? ` (N/A %)` : ` (0.00%)`)}
                                         </span>
@@ -642,15 +642,19 @@ export default function AssetsPage() {
                             </div>
                         );
                     })}
+                     {/* Message if category is selected but has no assets of any currency */}
+                     {allAssets.filter(a => a.category === category).length === 0 && (
+                        <p className="text-muted-foreground">No assets in this category yet. Add one using the button above.</p>
+                    )}
                     </CardContent>
                 </Card>
 
                 {displayedAssets.length === 0 && activeTab === category && (
                     <Card className="rounded-2xl shadow-lg">
                         <CardContent className="pt-6 text-center text-muted-foreground">
-                            <WalletCards className="mx-auto h-12 w-12 mb-4" />
-                            <p className="text-lg font-semibold">No assets in {categoryDisplayNames[category].toLowerCase()} yet!</p>
-                            <p>Add one using the "Add Asset" button above.</p>
+                            <WalletCards className="mx-auto h-12 w-12 mb-4 text-primary" />
+                            <p className="text-lg font-semibold">No {categoryDisplayNames[category].toLowerCase()} added yet!</p>
+                            <p>Use the "Add Asset" button above to track your {categoryDisplayNames[category].toLowerCase()}.</p>
                         </CardContent>
                     </Card>
                 )}
@@ -666,3 +670,4 @@ export default function AssetsPage() {
     </div>
   );
 }
+
