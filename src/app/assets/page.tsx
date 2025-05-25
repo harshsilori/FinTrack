@@ -59,6 +59,7 @@ const categoryDisplayNames: Record<AssetCategory, string> = {
 
 const assetCategories: AssetCategory[] = ['bank', 'stock', 'crypto', 'property', 'mutualfund'];
 
+const STALE_PRICE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
 export default function AssetsPage() {
   const { toast } = useToast();
@@ -70,6 +71,7 @@ export default function AssetsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  
   const activeTab = useMemo(() => {
     const tab = searchParams.get('category') as AssetCategory | 'overview' | null;
     if (tab && (assetCategories.includes(tab as AssetCategory) || tab === 'overview')) {
@@ -89,12 +91,11 @@ export default function AssetsPage() {
     router.push(`${pathname}?${params.toString()}`);
   };
 
-
   const displayedAssets = useMemo(() => {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return allAssets; // For overview, calculations use allAssets, display handled by specific cards
+    return allAssets; // For overview, all assets are used for portfolio snapshot
   }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
@@ -113,13 +114,13 @@ export default function AssetsPage() {
         quantity: 1,
         purchasePrice: 0,
         tickerSymbol: '',
-        currentPrice: undefined,
+        currentPrice: undefined, 
       });
     }
     setIsFormOpen(true);
   };
 
-  const handleRefreshPrice = async (asset: ContextAsset) => {
+  const handleRefreshPrice = useCallback(async (asset: ContextAsset) => {
     if (asset.category === 'bank' || asset.category === 'property') {
       toast({ title: "Manual Update", description: `${asset.name} value is updated manually or via statements.`, variant: "default" });
       return;
@@ -140,7 +141,39 @@ export default function AssetsPage() {
     } finally {
       setIsFetchingPrice(prev => ({ ...prev, [asset.id]: false }));
     }
-  };
+  }, [toast, updateAssetPrice]);
+
+
+  useEffect(() => {
+    const autoRefreshStaleAssets = async () => {
+      // console.log("Checking for stale assets to auto-refresh...");
+      for (const asset of allAssets) {
+        if (asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund') {
+          if (!asset.tickerSymbol) continue;
+
+          let isStale = true;
+          if (asset.lastPriceUpdate) {
+            const lastUpdateDate = new Date(asset.lastPriceUpdate);
+            if (Date.now() - lastUpdateDate.getTime() < STALE_PRICE_THRESHOLD_MS) {
+              isStale = false;
+            }
+          }
+          
+          if (isStale && !isFetchingPrice[asset.id]) { // Also check if not already fetching
+            // console.log(`Auto-refreshing price for stale asset: ${asset.name}`);
+            await handleRefreshPrice(asset);
+            // Small delay to avoid overwhelming APIs if many assets are stale
+            await new Promise(resolve => setTimeout(resolve, 500)); 
+          }
+        }
+      }
+    };
+
+    if (allAssets.length > 0) {
+        autoRefreshStaleAssets();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allAssets, handleRefreshPrice]); // Rerun if assets change or refresh function changes
 
   const handleSaveAsset = () => {
     if (!currentAsset || !currentAsset.name || !currentAsset.category || !currentAsset.currency) {
@@ -357,7 +390,7 @@ export default function AssetsPage() {
             </div>
           )}
           <p className="text-xs text-muted-foreground pt-2">
-            {asset.lastPriceUpdate ? `Price as of: ${new Date(asset.lastPriceUpdate).toLocaleDateString()}` : (isTrackableAsset ? 'Price not yet updated' : '')} <br/>
+            {asset.lastPriceUpdate ? `Price as of: ${new Date(asset.lastPriceUpdate).toLocaleTimeString()} ${new Date(asset.lastPriceUpdate).toLocaleDateString()}` : (isTrackableAsset ? 'Price not yet updated' : '')} <br/>
             Details last saved: {new Date(asset.lastUpdated).toLocaleDateString()}
           </p>
         </CardContent>
@@ -397,7 +430,7 @@ export default function AssetsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">My Assets</h1>
           <p className="text-muted-foreground">
-            Track your investments and net worth.
+            Track your investments and net worth across different categories.
           </p>
         </div>
         <Dialog open={isFormOpen} onOpenChange={(isOpen) => { setIsFormOpen(isOpen); if (!isOpen) setCurrentAsset(initialAssetFormState);}}>
@@ -514,7 +547,7 @@ export default function AssetsPage() {
                             <p className="text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
                                 <span className="text-sm text-muted-foreground ml-1">({currency} Total Portfolio)</span>
                             </p>
-                            {(totalData.dailyGain !== undefined) && (
+                            {(totalData.dailyGain !== 0) && ( // Only show if non-zero
                                 <div className="text-sm flex items-center mt-1">
                                 <span className="text-muted-foreground mr-1">Daily Gain/Loss:</span>
                                 <span className={totalData.dailyGain >= 0 ? 'text-green-600' : 'text-red-600'}>
@@ -523,7 +556,7 @@ export default function AssetsPage() {
                                 </span>
                                 </div>
                             )}
-                            {(totalData.allTimeGain !== undefined) && (
+                            {(totalData.allTimeGain !== 0) && ( // Only show if non-zero
                                 <div className="text-sm flex items-center mt-1">
                                 <span className="text-muted-foreground mr-1">All-Time Gain/Loss:</span>
                                 <span className={totalData.allTimeGain >= 0 ? 'text-green-600' : 'text-red-600'}>
@@ -559,7 +592,7 @@ export default function AssetsPage() {
                     <Coins className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                    {Object.keys(categoryTotalsByCurrency).length === 0 && <p className="text-muted-foreground">No assets in this category.</p>}
+                    {Object.keys(categoryTotalsByCurrency).length === 0 && <p className="text-muted-foreground">No assets in this category. Add one using the button above.</p>}
                     {Object.entries(categoryTotalsByCurrency).map(([currency, totalData]) => {
                         const allTimeGainLossPercent = totalData.totalPurchaseCost > 0 
                             ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100 
@@ -572,7 +605,7 @@ export default function AssetsPage() {
                             </p>
                             {isTrackableCategory && (
                                 <>
-                                    {(totalData.dailyGain !== undefined) && (
+                                    {(totalData.dailyGain !== 0) && ( // Only show if non-zero
                                         <div className="text-sm flex items-center mt-1">
                                         <span className="text-muted-foreground mr-1">Daily Gain/Loss:</span>
                                         <span className={totalData.dailyGain >= 0 ? 'text-green-600' : 'text-red-600'}>
@@ -581,7 +614,7 @@ export default function AssetsPage() {
                                         </span>
                                         </div>
                                     )}
-                                    {(totalData.allTimeGain !== undefined) && (
+                                    {(totalData.allTimeGain !== 0) && ( // Only show if non-zero
                                         <div className="text-sm flex items-center mt-1">
                                         <span className="text-muted-foreground mr-1">All-Time Gain/Loss:</span>
                                         <span className={totalData.allTimeGain >= 0 ? 'text-green-600' : 'text-red-600'}>
@@ -622,3 +655,5 @@ export default function AssetsPage() {
     </div>
   );
 }
+
+    
