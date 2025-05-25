@@ -1,5 +1,5 @@
 
-'use server'; 
+'use server';
 
 import type { AssetCategory, AssetPriceData } from '@/contexts/AssetContext';
 
@@ -11,36 +11,36 @@ interface PriceFetchResult {
 
 // Base patterns for price history - these are relative patterns
 const mockPriceHistoryPatterns: Record<string, AssetPriceData[]> = {
-  default: [ 
+  default: [
     { date: '2024-07-01', price: 100 }, { date: '2024-07-08', price: 102 }, { date: '2024-07-15', price: 101 }, { date: '2024-07-22', price: 105 }, { date: '2024-07-29', price: 108 },
   ],
-  tech: [ 
+  tech: [
     { date: '2024-07-01', price: 200 }, { date: '2024-07-08', price: 205 }, { date: '2024-07-15', price: 210 }, { date: '2024-07-22', price: 208 }, { date: '2024-07-29', price: 215 },
   ],
-  cryptoGeneral: [ 
+  cryptoGeneral: [
     { date: '2024-07-01', price: 0.80 }, { date: '2024-07-08', price: 0.85 }, { date: '2024-07-15', price: 0.78 }, { date: '2024-07-22', price: 0.90 }, { date: '2024-07-29', price: 0.95 },
   ],
-  cryptoMajorBTC: [ 
+  cryptoMajorBTC: [
     { date: '2024-07-01', price: 60000 }, { date: '2024-07-08', price: 62000 }, { date: '2024-07-15', price: 59000 }, { date: '2024-07-22', price: 63000 }, { date: '2024-07-29', price: 65000 },
   ],
-  cryptoMajorETH: [ 
+  cryptoMajorETH: [
     { date: '2024-07-01', price: 3000 }, { date: '2024-07-08', price: 3200 }, { date: '2024-07-15', price: 2900 }, { date: '2024-07-22', price: 3300 }, { date: '2024-07-29', price: 3500 },
   ],
-  cryptoADA: [ 
+  cryptoADA: [
     { date: '2024-07-01', price: 0.55 }, { date: '2024-07-08', price: 0.62 }, { date: '2024-07-15', price: 0.58 }, { date: '2024-07-22', price: 0.66 }, { date: '2024-07-29', price: 0.70 },
   ],
-  mutualfund: [ 
+  mutualfund: [
     { date: '2024-07-01', price: 50 }, { date: '2024-07-08', price: 51 }, { date: '2024-07-15', price: 50.5 }, { date: '2024-07-22', price: 52 }, { date: '2024-07-29', price: 53 },
   ],
 };
 
 function getDeterministicFactor(str: string | undefined): number {
-  if (!str || str.length === 0) return 0.5; 
+  if (!str || str.length === 0) return 0.5;
   let sum = 0;
-  for (let i = 0; i < Math.min(str.length, 10); i++) { 
+  for (let i = 0; i < Math.min(str.length, 10); i++) {
     sum += str.charCodeAt(i);
   }
-  return (sum % 101) / 100; 
+  return (sum % 101) / 100;
 }
 
 export async function fetchAssetPrice(
@@ -49,184 +49,188 @@ export async function fetchAssetPrice(
   currency: string = 'USD'
 ): Promise<PriceFetchResult> {
   console.log(`Fetching price for ${category} - ${tickerSymbol || 'N/A'} in ${currency}`);
-  
-  // --- START REAL API INTEGRATION SECTION (Illustrative) ---
-  // You would replace the mock logic below with actual API calls.
-  // Store API keys in environment variables (e.g., .env.local) and access them via process.env.YOUR_API_KEY
-  // Remember to handle errors, rate limits, and data parsing for each API.
 
-  /*
-  // Example for Crypto using CoinGecko API (public, no key needed for simple price)
-  if (category === 'crypto' && tickerSymbol) {
-    // Map your tickerSymbol to CoinGecko's asset ID (e.g., 'BTC' -> 'bitcoin', 'ETH' -> 'ethereum')
-    const coinGeckoId = tickerSymbol.toLowerCase() === 'btc' ? 'bitcoin' : 
-                        tickerSymbol.toLowerCase() === 'eth' ? 'ethereum' : 
-                        tickerSymbol.toLowerCase() === 'ada' ? 'cardano' : 
-                        tickerSymbol.toLowerCase(); // Fallback, might need better mapping
+  // --- START REAL API INTEGRATION SECTION ---
+  if (category === 'stock' && tickerSymbol) {
+    const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
+    if (apiKey) {
+      console.log(`Attempting to fetch stock data for ${tickerSymbol} using Alpha Vantage API.`);
+      const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${tickerSymbol}&apikey=${apiKey}`;
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Alpha Vantage API request failed for ${tickerSymbol}: ${response.status} ${response.statusText}`, errorText);
+          throw new Error(`Alpha Vantage API request failed: ${response.statusText}`);
+        }
+        const data = await response.json();
 
-    const targetCurrencyLower = currency.toLowerCase();
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinGeckoId}&vs_currencies=${targetCurrencyLower}&include_24hr_change=true`;
+        if (data['Global Quote'] && data['Global Quote']['05. price']) {
+          const currentPrice = parseFloat(data['Global Quote']['05. price']);
+          const previousClosePrice = parseFloat(data['Global Quote']['08. previous close']);
 
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`CoinGecko API request failed: ${response.statusText}`);
+          // For priceHistory, Alpha Vantage's GLOBAL_QUOTE doesn't provide it.
+          // You'd typically use TIME_SERIES_DAILY_ADJUSTED or similar for history.
+          // For now, we'll generate a simple mock history based on the current price.
+          const historyPattern = mockPriceHistoryPatterns.default;
+          const lastPatternPoint = historyPattern.length > 0 ? historyPattern[historyPattern.length - 1].price : currentPrice;
+          const scaleFactor = lastPatternPoint !== 0 ? currentPrice / lastPatternPoint : 1;
+          const priceHistory = historyPattern.map(p => ({
+            ...p,
+            price: parseFloat((p.price * scaleFactor).toFixed(2))
+          }));
+          if (priceHistory.length > 0) {
+            priceHistory[priceHistory.length - 1].price = currentPrice;
+          }
+
+
+          // Alpha Vantage prices are typically in USD.
+          // If target currency is not USD, you'd need an exchange rate API here.
+          // For simplicity, this example assumes prices are directly usable or currency matches.
+          // TODO: Implement currency conversion if fetched currency (USD) !== target currency.
+           if (currency !== 'USD') {
+             console.warn(`Alpha Vantage provides USD prices. Currency conversion to ${currency} is not yet implemented. Displaying as USD.`);
+           }
+
+
+          return {
+            currentPrice: parseFloat(currentPrice.toFixed(2)),
+            previousClosePrice: parseFloat(previousClosePrice.toFixed(2)),
+            priceHistory: priceHistory,
+          };
+        } else if (data['Note']) {
+           console.warn(`Alpha Vantage API call limit likely reached for ${tickerSymbol}: ${data['Note']}`);
+           // Fall through to mock data
+        } else {
+          console.warn(`Price data not found for ${tickerSymbol} in Alpha Vantage response:`, data);
+          // Fall through to mock data
+        }
+      } catch (error) {
+        console.error(`Error fetching from Alpha Vantage for ${tickerSymbol}:`, error);
+        // Fall through to mock data
       }
-      const data = await response.json();
-      
-      if (data[coinGeckoId] && data[coinGeckoId][targetCurrencyLower]) {
-        const currentPrice = data[coinGeckoId][targetCurrencyLower];
-        const dailyChange = data[coinGeckoId][`${targetCurrencyLower}_24h_change`] || 0;
-        const previousClosePrice = currentPrice / (1 + (dailyChange / 100));
-
-        // For priceHistory, you'd need another CoinGecko endpoint (e.g., /coins/{id}/market_chart)
-        // and then map its data to AssetPriceData[] format.
-        // This example just returns a simple mock history based on current price for now.
-        const historyPattern = mockPriceHistoryPatterns.cryptoGeneral; // Or a more specific one
-        const lastPatternPoint = historyPattern.length > 0 ? historyPattern[historyPattern.length - 1].price : currentPrice;
-        const scaleFactor = lastPatternPoint !== 0 ? currentPrice / lastPatternPoint : 1;
-        const priceHistory = historyPattern.map(p => ({
-          ...p,
-          price: parseFloat((p.price * scaleFactor).toFixed(2))
-        }));
-        if (priceHistory.length > 0) priceHistory[priceHistory.length -1].price = currentPrice;
-
-
-        return {
-          currentPrice: parseFloat(currentPrice.toFixed(2)),
-          previousClosePrice: parseFloat(previousClosePrice.toFixed(2)),
-          priceHistory: priceHistory, // Replace with actual fetched history
-        };
-      } else {
-        console.warn(`Price data not found for ${coinGeckoId} in ${targetCurrencyLower} from CoinGecko.`);
-      }
-    } catch (error) {
-      console.error("Error fetching from CoinGecko:", error);
-      // Fall through to mock data if API fails
+    } else {
+      console.log("Alpha Vantage API key not found. Falling back to mock stock data.");
     }
   }
 
-  // Placeholder for Stocks API (e.g., Yahoo Finance through a proxy/backend or a dedicated API like IEX Cloud)
-  if (category === 'stock' && tickerSymbol) {
-    // const YFINANCE_API_KEY = process.env.YFINANCE_API_KEY; 
-    // const url = `https://your-stock-api-endpoint.com/price?symbol=${tickerSymbol}&currency=${currency}&apikey=${YFINANCE_API_KEY}`;
+  // --- Placeholder for Crypto API (e.g., CoinGecko) ---
+  if (category === 'crypto' && tickerSymbol) {
+    // const coinGeckoId = tickerSymbol.toLowerCase(); // Map your ticker to CoinGecko ID
+    // const targetCurrencyLower = currency.toLowerCase();
+    // const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinGeckoId}&vs_currencies=${targetCurrencyLower}&include_24hr_change=true`;
     // try {
     //   // ... fetch logic ...
-    //   // const currentPrice = ...;
-    //   // const previousClosePrice = ...;
-    //   // const priceHistory = ...; // Map API response to AssetPriceData[]
-    //   // return { currentPrice, previousClosePrice, priceHistory };
+    //   // return { currentPrice, previousClosePrice, priceHistory (from another endpoint) };
     // } catch (error) {
-    //   console.error("Error fetching stock data:", error);
+    //   console.error("Error fetching crypto data:", error);
     // }
-    console.log("Stock API integration placeholder for ticker:", tickerSymbol, "currency:", currency);
+    console.log("Crypto API integration placeholder for symbol:", tickerSymbol, "currency:", currency);
   }
 
-  // Placeholder for Mutual Funds API (e.g., AMFI India, Morningstar, or a custom JSON)
+  // --- Placeholder for Mutual Funds API (e.g., AMFI India, Morningstar, or custom JSON) ---
   if (category === 'mutualfund' && tickerSymbol) {
-    // const AMFI_API_ENDPOINT = '...'; // AMFI data often needs scraping or specific provider APIs
     // try {
     //   // ... fetch logic for NAV ...
-    //   // const currentPrice = NAV;
-    //   // const previousClosePrice = previousNAV; // MF data might not have typical open/close
-    //   // const priceHistory = ...;
     //   // return { currentPrice, previousClosePrice, priceHistory };
     // } catch (error) {
     //   console.error("Error fetching mutual fund data:", error);
     // }
     console.log("Mutual Fund API integration placeholder for symbol:", tickerSymbol, "currency:", currency);
   }
-  */
   // --- END REAL API INTEGRATION SECTION ---
 
 
   // --- MOCK DATA GENERATION (Fallback or if APIs not implemented) ---
   console.log(`Using MOCK data for ${category} - ${tickerSymbol || 'N/A'} in ${currency}`);
-  await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300)); // Shorter delay for mock
+  await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
 
   let baseTargetPriceInCurrency: number;
   let historyPatternKey = 'default';
-  const deterministicFactor = getDeterministicFactor(tickerSymbol); 
+  const deterministicFactor = getDeterministicFactor(tickerSymbol);
 
   switch (category) {
     case 'stock':
       historyPatternKey = tickerSymbol?.toLowerCase().includes('tech') || tickerSymbol?.toLowerCase().includes('google') || tickerSymbol?.toLowerCase().includes('apple') ? 'tech' : 'default';
       if (currency === 'INR') {
-        baseTargetPriceInCurrency = 500 + deterministicFactor * (4500 - 500); 
+        baseTargetPriceInCurrency = (1000 + deterministicFactor * (15000 - 1000)); // e.g. 1000 to 15000 INR for a stock
       } else if (currency === 'EUR') {
-        baseTargetPriceInCurrency = 50 + deterministicFactor * (450 - 50);   
-      } else { 
-        baseTargetPriceInCurrency = 50 + deterministicFactor * (450 - 50);   
+        baseTargetPriceInCurrency = (10 + deterministicFactor * (500 - 10)); // e.g. 10 to 500 EUR
+      } else { // USD
+        baseTargetPriceInCurrency = (10 + deterministicFactor * (500 - 10)); // e.g. 10 to 500 USD
       }
       break;
     case 'crypto':
       const upperTicker = tickerSymbol?.toUpperCase();
       if (upperTicker === 'BTC' || upperTicker === 'BTCUSD') {
         historyPatternKey = 'cryptoMajorBTC';
-        if (currency === 'INR') baseTargetPriceInCurrency = 5000000 + deterministicFactor * (1000000); 
-        else if (currency === 'EUR') baseTargetPriceInCurrency = 55000 + deterministicFactor * (10000); 
-        else baseTargetPriceInCurrency = 60000 + deterministicFactor * (10000); 
+        if (currency === 'INR') baseTargetPriceInCurrency = (5000000 + deterministicFactor * (1000000)); // 5M to 6M INR
+        else if (currency === 'EUR') baseTargetPriceInCurrency = (55000 + deterministicFactor * (10000)); // 55k to 65k EUR
+        else baseTargetPriceInCurrency = (60000 + deterministicFactor * (10000)); // 60k to 70k USD
       } else if (upperTicker === 'ETH' || upperTicker === 'ETHUSD') {
         historyPatternKey = 'cryptoMajorETH';
-        if (currency === 'INR') baseTargetPriceInCurrency = 240000 + deterministicFactor * (40000);  
-        else if (currency === 'EUR') baseTargetPriceInCurrency = 2800 + deterministicFactor * (500);    
-        else baseTargetPriceInCurrency = 3000 + deterministicFactor * (500);    
-      } else if (upperTicker === 'ADA') { 
+        if (currency === 'INR') baseTargetPriceInCurrency = (240000 + deterministicFactor * (60000));  // 240k to 300k INR
+        else if (currency === 'EUR') baseTargetPriceInCurrency = (2800 + deterministicFactor * (700));    // 2.8k to 3.5k EUR
+        else baseTargetPriceInCurrency = (3000 + deterministicFactor * (500));    // 3k to 3.5k USD
+      } else if (upperTicker === 'ADA') {
         historyPatternKey = 'cryptoADA';
-        if (currency === 'INR') baseTargetPriceInCurrency = 50 + deterministicFactor * (30); 
-        else if (currency === 'EUR') baseTargetPriceInCurrency = 0.5 + deterministicFactor * (0.3); 
-        else baseTargetPriceInCurrency = 0.6 + deterministicFactor * (0.4); 
-      } else { 
+        if (currency === 'INR') baseTargetPriceInCurrency = (50 + deterministicFactor * (30)); // 50 to 80 INR
+        else if (currency === 'EUR') baseTargetPriceInCurrency = (0.5 + deterministicFactor * (0.3)); // 0.5 to 0.8 EUR
+        else baseTargetPriceInCurrency = (0.6 + deterministicFactor * (0.4)); // 0.6 to 1.0 USD
+      } else { // General altcoins
         historyPatternKey = 'cryptoGeneral';
-        if (currency === 'INR') baseTargetPriceInCurrency = 15 + deterministicFactor * (185 - 15);     
-        else if (currency === 'EUR') baseTargetPriceInCurrency = 0.15 + deterministicFactor * (2.5 - 0.15); 
-        else baseTargetPriceInCurrency = 0.2 + deterministicFactor * (3 - 0.2);     
+        if (currency === 'INR') baseTargetPriceInCurrency = (15 + deterministicFactor * (185 - 15)); // 15 to 200 INR
+        else if (currency === 'EUR') baseTargetPriceInCurrency = (0.15 + deterministicFactor * (2.5 - 0.15)); // 0.15 to 2.5 EUR
+        else baseTargetPriceInCurrency = (0.2 + deterministicFactor * (3 - 0.2)); // 0.2 to 3 USD
       }
       break;
     case 'mutualfund':
       historyPatternKey = 'mutualfund';
       if (currency === 'INR') {
-        baseTargetPriceInCurrency = 200 + deterministicFactor * (800 - 200); 
+        baseTargetPriceInCurrency = (200 + deterministicFactor * (800 - 200)); // 200 to 1000 INR NAV
       } else if (currency === 'EUR') {
-        baseTargetPriceInCurrency = 20 + deterministicFactor * (100 - 20);  
-      } else { 
-        baseTargetPriceInCurrency = 20 + deterministicFactor * (100 - 20);  
+        baseTargetPriceInCurrency = (20 + deterministicFactor * (100 - 20));  // 20 to 100 EUR NAV
+      } else { // USD
+        baseTargetPriceInCurrency = (20 + deterministicFactor * (100 - 20));  // 20 to 100 USD NAV
       }
       break;
     case 'bank':
     case 'property':
       const existingValueBase = (currency === 'INR' ? 500000 : currency === 'EUR' ? 75000 : 100000);
-      const stableBaseForNonTrackable = existingValueBase + deterministicFactor * (existingValueBase * 0.1); // More varied base
-      
-      const currentPriceForNonTrackable = stableBaseForNonTrackable * (1 + (Math.random() - 0.5) * 0.005); 
+      const stableBaseForNonTrackable = existingValueBase + deterministicFactor * (existingValueBase * 0.1);
+
+      const currentPriceForNonTrackable = stableBaseForNonTrackable * (1 + (Math.random() - 0.5) * 0.005);
       const previousCloseForNonTrackable = currentPriceForNonTrackable * (1 + (Math.random() - 0.5) * 0.002);
        return {
         currentPrice: parseFloat(currentPriceForNonTrackable.toFixed(2)),
         previousClosePrice: parseFloat(previousCloseForNonTrackable.toFixed(2)),
-        priceHistory: [ 
-            {date: new Date(Date.now() - 86400000 * 30).toISOString().split('T')[0], price: parseFloat((stableBaseForNonTrackable * 0.99).toFixed(2))}, 
+        priceHistory: [
+            {date: new Date(Date.now() - 86400000 * 30).toISOString().split('T')[0], price: parseFloat((stableBaseForNonTrackable * 0.99).toFixed(2))},
             {date: new Date().toISOString().split('T')[0], price: parseFloat(currentPriceForNonTrackable.toFixed(2))}
         ],
       };
-    default: 
-      baseTargetPriceInCurrency = 100 * (currency === 'INR' ? 80 : currency === 'EUR' ? 0.9 : 1); 
+    default: // Should not happen if category is always valid
+      baseTargetPriceInCurrency = 100;
   }
 
-  const currentPriceInTargetCurrency = baseTargetPriceInCurrency * (1 + (Math.random() - 0.49) * 0.04); // Fluctuate by +/- 2% (less volatile)
-  const previousClosePriceInTargetCurrency = currentPriceInTargetCurrency * (1 + (Math.random() - 0.49) * 0.03); // Fluctuate by +/- 1.5% from current
+  // Apply a small random fluctuation to the stable base price
+  const currentPriceInTargetCurrency = baseTargetPriceInCurrency * (1 + (Math.random() - 0.5) * 0.04); // Fluctuate by +/- 2%
+  const previousClosePriceInTargetCurrency = currentPriceInTargetCurrency * (1 + (Math.random() - 0.5) * 0.03); // Fluctuate by +/- 1.5% from current
 
   let baseHistoryPattern = mockPriceHistoryPatterns[historyPatternKey] || mockPriceHistoryPatterns.default;
   const lastPatternPointValue = baseHistoryPattern.length > 0 ? baseHistoryPattern[baseHistoryPattern.length - 1].price : currentPriceInTargetCurrency;
+
+  // Ensure scaleFactor is not zero or excessively small/large
   const scaleFactor = lastPatternPointValue !== 0 ? currentPriceInTargetCurrency / lastPatternPointValue : 1;
 
   const finalPriceHistory = baseHistoryPattern.map(p => ({
     ...p,
-    price: parseFloat((p.price * scaleFactor).toFixed(2)) 
+    price: parseFloat((p.price * scaleFactor).toFixed(2))
   }));
 
   if (finalPriceHistory.length > 0) {
       finalPriceHistory[finalPriceHistory.length - 1].price = parseFloat(currentPriceInTargetCurrency.toFixed(2));
-  } else { 
+  } else {
       finalPriceHistory.push({ date: new Date().toISOString().split('T')[0], price: parseFloat(currentPriceInTargetCurrency.toFixed(2))});
   }
 
