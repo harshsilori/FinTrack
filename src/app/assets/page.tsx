@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,10 +74,11 @@ export default function AssetsPage() {
   
   const activeTab = useMemo(() => {
     const tab = searchParams.get('category') as AssetCategory | 'overview' | null;
-    if (tab && (assetCategories.includes(tab as AssetCategory) || tab === 'overview')) {
+    if (tab === 'overview' || !tab) return 'overview'; // Default to overview
+    if (assetCategories.includes(tab as AssetCategory)) {
         return tab;
     }
-    return 'overview';
+    return 'overview'; // Fallback for unknown category
   }, [searchParams]);
 
 
@@ -95,7 +96,9 @@ export default function AssetsPage() {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return allAssets; // For overview, all assets are used for portfolio snapshot
+    // For overview tab, no individual assets are listed directly under it.
+    // Individual assets are shown when a specific category tab is selected.
+    return []; 
   }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
@@ -107,9 +110,11 @@ export default function AssetsPage() {
     if (asset) {
       setCurrentAsset({ ...asset });
     } else {
+      // If adding new asset from a specific category tab, prefill that category
+      const prefilledCategory = (activeTab && activeTab !== 'overview') ? activeTab : 'stock';
       setCurrentAsset({
         name: '',
-        category: (activeTab && activeTab !== 'overview' ? activeTab : 'stock') as AssetCategory,
+        category: prefilledCategory as AssetCategory,
         currency: 'USD',
         quantity: 1,
         purchasePrice: 0,
@@ -232,9 +237,12 @@ export default function AssetsPage() {
         currency: currentAsset.currency!,
         quantity: quantityToSave,
         purchasePrice: isTrackableType ? (Number(currentAsset.purchasePrice) || 0) : undefined,
+        // For new trackable assets, initial current price is set to purchase price. It will be updated on first fetch.
+        // For bank/property, currentPrice is user-input.
         currentPrice: isTrackableType ? (Number(currentAsset.purchasePrice) || 0) : (Number(currentAsset.currentPrice) || 0),
         tickerSymbol: isTrackableType ? currentAsset.tickerSymbol : undefined,
-        previousClosePrice: isTrackableType ? (Number(currentAsset.purchasePrice) || 0) : undefined,
+        // previousClosePrice will be set by first fetch for trackable assets
+        previousClosePrice: isTrackableType ? (Number(currentAsset.purchasePrice) || 0) : undefined, 
       };
       addAsset(newAssetPayload);
       toast({ title: "Asset Added", description: `${newAssetPayload.name} has been added.` });
@@ -252,7 +260,7 @@ export default function AssetsPage() {
     return value.toLocaleString(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
   
-  const calculateTotals = (assetsToSummarize: ContextAsset[]) => {
+  const calculateTotals = useCallback((assetsToSummarize: ContextAsset[]) => {
     const totals: Record<string, {marketValue: number, dailyGain: number, allTimeGain: number, totalPurchaseCost: number }> = {};
     assetsToSummarize.forEach(asset => {
       if (!totals[asset.currency]) {
@@ -274,15 +282,17 @@ export default function AssetsPage() {
       }
     });
     return totals;
-  };
+  }, [getAssetMarketValue]);
 
-  const portfolioTotalsByCurrency = useMemo(() => calculateTotals(allAssets), [allAssets, getAssetMarketValue]);
-  const categoryTotalsByCurrency = useMemo(() => {
+  const portfolioTotalsByCurrency = useMemo(() => calculateTotals(allAssets), [allAssets, calculateTotals]);
+  
+  const categorySpecificTotals = useMemo(() => {
     if (activeTab && activeTab !== 'overview') {
-        return calculateTotals(displayedAssets);
+      const filteredAssetsForTab = allAssets.filter(asset => asset.category === activeTab);
+      return calculateTotals(filteredAssetsForTab);
     }
     return {};
-  }, [displayedAssets, activeTab, getAssetMarketValue]);
+  }, [allAssets, activeTab, calculateTotals]);
 
 
   const handleCategoryChange = (value: AssetCategory) => {
@@ -443,7 +453,8 @@ export default function AssetsPage() {
             <DialogHeader>
             <DialogTitle>{currentAsset?.id ? 'Edit Asset' : `Add New ${activeTab && activeTab !== 'overview' ? categoryDisplayNames[activeTab as AssetCategory].slice(0,-1) : 'Asset'}`}</DialogTitle>
             <DialogDescription>
-                Enter the details for your asset. Market data is mocked. Global currency settings and auto-conversion are planned for a future update.
+                Enter the details for your asset. Click "Save Asset" when done.
+                Global currency settings and auto-conversion are planned for a future update.
             </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -592,8 +603,8 @@ export default function AssetsPage() {
                     <Coins className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                    {Object.keys(categoryTotalsByCurrency).length === 0 && <p className="text-muted-foreground">No assets in this category. Add one using the button above.</p>}
-                    {Object.entries(categoryTotalsByCurrency).map(([currency, totalData]) => {
+                    {Object.keys(categorySpecificTotals).length === 0 && <p className="text-muted-foreground">No assets in this category. Add one using the button above.</p>}
+                    {Object.entries(categorySpecificTotals).map(([currency, totalData]) => {
                         const allTimeGainLossPercent = totalData.totalPurchaseCost > 0 
                             ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100 
                             : (totalData.allTimeGain !== 0 ? Infinity : 0);
@@ -655,5 +666,3 @@ export default function AssetsPage() {
     </div>
   );
 }
-
-    
