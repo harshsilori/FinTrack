@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info } from 'lucide-react';
+import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
@@ -71,6 +71,7 @@ export default function AssetsPage() {
   const [isFetchingPrice, setIsFetchingPrice] = useState<Record<string, boolean>>({});
   const [initialRefreshPerformedForTab, setInitialRefreshPerformedForTab] = useState<Record<string, boolean>>({});
 
+
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -98,7 +99,7 @@ export default function AssetsPage() {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return [];
+    return []; // No assets displayed directly under 'overview' tab for individual cards
   }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
@@ -148,8 +149,8 @@ export default function AssetsPage() {
   }, [toast, updateAssetPrice]);
 
 
- useEffect(() => {
-    const performInitialTabRefresh = async () => {
+  useEffect(() => {
+    const performTabRefresh = async () => {
       if (activeTab === 'overview' || !activeTab || initialRefreshPerformedForTab[activeTab]) {
         return;
       }
@@ -171,11 +172,10 @@ export default function AssetsPage() {
       setInitialRefreshPerformedForTab(prev => ({ ...prev, [activeTab]: true }));
     };
 
-    if (allAssets.length > 0) {
-      performInitialTabRefresh();
+    if (allAssets.length > 0 && activeTab !== 'overview') {
+      performTabRefresh();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, allAssets, handleRefreshPrice]);
+  }, [activeTab, allAssets, handleRefreshPrice, initialRefreshPerformedForTab]);
 
 
   const handleSaveAsset = () => {
@@ -240,7 +240,7 @@ export default function AssetsPage() {
         tickerSymbol: isTrackableCategory ? currentAsset.tickerSymbol : undefined,
         previousClosePrice: isTrackableCategory ? (Number(currentAsset.purchasePrice) || 0) : undefined,
       };
-      addedAssetWithId = addAsset(newAssetPayload); // Capture the returned asset
+      addedAssetWithId = addAsset(newAssetPayload);
       toast({ title: "Asset Added", description: `${newAssetPayload.name} has been added.` });
     }
     setIsFormOpen(false);
@@ -320,6 +320,27 @@ export default function AssetsPage() {
   const AssetCardComponent = ({ asset }: { asset: ContextAsset }) => {
     const marketValue = getAssetMarketValue(asset);
     const isTrackableAsset = asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund';
+
+    const [clientFormattedLastPriceUpdate, setClientFormattedLastPriceUpdate] = useState<string | null>(null);
+    const [clientFormattedLastUpdated, setClientFormattedLastUpdated] = useState<string | null>(null);
+
+    useEffect(() => {
+      let priceUpdateText: string | null = null;
+      if (asset.lastPriceUpdate) {
+        priceUpdateText = `Price as of: ${new Date(asset.lastPriceUpdate).toLocaleTimeString()} ${new Date(asset.lastPriceUpdate).toLocaleDateString()}`;
+      } else if (isTrackableAsset) {
+        priceUpdateText = 'Price not yet updated';
+      }
+      setClientFormattedLastPriceUpdate(priceUpdateText);
+
+      let detailsSavedText: string | null = null;
+      if (asset.lastUpdated) {
+        detailsSavedText = `Details last saved: ${new Date(asset.lastUpdated).toLocaleDateString()}`;
+      }
+      setClientFormattedLastUpdated(detailsSavedText);
+
+    }, [asset.lastPriceUpdate, asset.lastUpdated, isTrackableAsset]);
+
 
     let dailyGainLoss = 0;
     let dailyGainLossPercent = 0;
@@ -408,8 +429,15 @@ export default function AssetsPage() {
             </div>
           )}
           <p className="text-xs text-muted-foreground pt-2">
-            {asset.lastPriceUpdate ? `Price as of: ${new Date(asset.lastPriceUpdate).toLocaleTimeString()} ${new Date(asset.lastPriceUpdate).toLocaleDateString()}` : (isTrackableAsset ? 'Price not yet updated' : '')} <br/>
-            Details last saved: {new Date(asset.lastUpdated).toLocaleDateString()}
+            {clientFormattedLastPriceUpdate !== null 
+              ? clientFormattedLastPriceUpdate 
+              : (isTrackableAsset && asset.lastPriceUpdate === undefined ? "Loading price date..." : "")
+            }
+            {(clientFormattedLastPriceUpdate && clientFormattedLastPriceUpdate.trim() !== "" && clientFormattedLastUpdated && clientFormattedLastUpdated.trim() !== "") && <br />}
+            {clientFormattedLastUpdated !== null 
+              ? clientFormattedLastUpdated 
+              : (asset.lastUpdated ? "Loading save date..." : "")
+            }
           </p>
         </CardContent>
         <CardFooter className="flex justify-between items-center gap-2">
@@ -690,3 +718,4 @@ export default function AssetsPage() {
     </div>
   );
 }
+
