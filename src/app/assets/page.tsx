@@ -1,10 +1,11 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -98,13 +99,17 @@ export default function AssetsPage() {
       params.set('category', newTabValue);
     }
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
+     // Reset initial refresh flags when tab changes to ensure refresh on next visit
+    if (newTabValue !== 'overview') {
+      setInitialRefreshPerformedForTab(prev => ({ ...prev, [newTabValue]: false }));
+    }
   };
 
   const displayedAssets = useMemo(() => {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return []; // For overview tab, no individual assets are listed directly under it.
+    return []; // For overview tab, individual assets are not listed directly under it.
   }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
@@ -200,7 +205,7 @@ export default function AssetsPage() {
   }, [toast, updateAssetPrice]);
 
 
- useEffect(() => {
+  useEffect(() => {
     const performTabRefresh = async () => {
         if (activeTab === 'overview' || !activeTab || initialRefreshPerformedForTab[activeTab] || !allAssets.length) {
             return;
@@ -214,6 +219,7 @@ export default function AssetsPage() {
         );
 
         if (assetsInTabToRefresh.length > 0) {
+            console.log(`Refreshing ${assetsInTabToRefresh.length} assets in tab ${activeTab}`);
             for (const asset of assetsInTabToRefresh) {
                 if (!isFetchingPrice[asset.id]) { // Check if already fetching
                     await handleRefreshPrice(asset);
@@ -228,7 +234,8 @@ export default function AssetsPage() {
       performTabRefresh();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, allAssets, initialRefreshPerformedForTab]); // Removed handleRefreshPrice, isFetchingPrice to prevent loops
+  }, [activeTab, allAssets, initialRefreshPerformedForTab]); // Removed handleRefreshPrice to break potential loops
+
 
   const handleSaveAsset = () => {
     if (!currentAsset || !currentAsset.name || !currentAsset.category || !currentAsset.currency) {
@@ -908,3 +915,4 @@ export default function AssetsPage() {
     </div>
   );
 }
+
