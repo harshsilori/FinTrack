@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,13 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, ExternalLink, AlertTriangle, Search } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from '@/components/ui/popover';
+import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, ExternalLink, AlertTriangle, Search, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { useToast } from "@/hooks/use-toast";
 import { useAssets, type Asset as ContextAsset, type AssetCategory } from '@/contexts/AssetContext';
-import { fetchAssetPrice } from '@/services/marketService';
+import { fetchAssetPrice, searchTickerSymbols, type TickerSuggestion } from '@/services/marketService';
 import Link from 'next/link';
 
 const assetIcons: Record<AssetCategory, React.ReactNode> = {
@@ -71,6 +72,13 @@ export default function AssetsPage() {
   const [isFetchingPrice, setIsFetchingPrice] = useState<Record<string, boolean>>({});
   const [initialRefreshPerformedForTab, setInitialRefreshPerformedForTab] = useState<Record<string, boolean>>({});
 
+  // For Ticker Search
+  const [tickerSearchQuery, setTickerSearchQuery] = useState('');
+  const [tickerSuggestions, setTickerSuggestions] = useState<TickerSuggestion[]>([]);
+  const [isTickerSearching, setIsTickerSearching] = useState(false);
+  const [showTickerSuggestionsPopover, setShowTickerSuggestionsPopover] = useState(false);
+  const tickerInputRef = useRef<HTMLInputElement>(null);
+
 
   const router = useRouter();
   const pathname = usePathname();
@@ -81,7 +89,7 @@ export default function AssetsPage() {
     if (tabParam && (assetCategories.includes(tabParam as AssetCategory) || tabParam === 'overview')) {
         return tabParam;
     }
-    return 'overview'; // Default to overview
+    return 'overview'; 
   }, [searchParams]);
 
 
@@ -93,13 +101,17 @@ export default function AssetsPage() {
       params.set('category', newTabValue);
     }
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
+     // Reset initial refresh flag when tab changes so it refreshes on next view if needed
+    if (newTabValue !== 'overview') {
+        setInitialRefreshPerformedForTab(prev => ({ ...prev, [newTabValue]: false }));
+    }
   };
 
   const displayedAssets = useMemo(() => {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return [];
+    return []; // In overview tab, we don't list individual assets here.
   }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
@@ -110,18 +122,21 @@ export default function AssetsPage() {
   const openForm = (asset?: ContextAsset) => {
     if (asset) {
       setCurrentAsset({ ...asset });
+      setTickerSearchQuery(asset.tickerSymbol || '');
     } else {
       const prefilledCategory = (activeTab && activeTab !== 'overview') ? activeTab : 'stock';
-      setCurrentAsset({
-        name: '',
+      const newInitialState = {
+        ...initialAssetFormState,
         category: prefilledCategory as AssetCategory,
-        currency: 'USD',
         quantity: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? 1 : 1,
         purchasePrice: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? undefined : 0,
-        // currentPrice removed - will be fetched
         tickerSymbol: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? undefined : '',
-      });
+      }
+      setCurrentAsset(newInitialState);
+      setTickerSearchQuery(newInitialState.tickerSymbol || '');
     }
+    setTickerSuggestions([]);
+    setShowTickerSuggestionsPopover(false);
     setIsFormOpen(true);
   };
 
@@ -184,15 +199,15 @@ export default function AssetsPage() {
             asset.category === activeTab &&
             (asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund') &&
             asset.tickerSymbol &&
-            !isFetchingPrice[asset.id] && // Check if not already fetching
+            !isFetchingPrice[asset.id] && 
             (!asset.lastPriceUpdate || (new Date().getTime() - new Date(asset.lastPriceUpdate).getTime() > STALE_PRICE_THRESHOLD_MS))
         );
 
         if (assetsInTabToRefresh.length > 0) {
             for (const asset of assetsInTabToRefresh) {
-                if (!isFetchingPrice[asset.id]) { // Double check before fetching
+                if (!isFetchingPrice[asset.id]) { 
                     await handleRefreshPrice(asset);
-                    await new Promise(resolve => setTimeout(resolve, 500)); // Stagger API calls
+                    await new Promise(resolve => setTimeout(resolve, 500)); 
                 }
             }
         }
@@ -203,7 +218,7 @@ export default function AssetsPage() {
         performTabRefresh();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, allAssets, initialRefreshPerformedForTab]); // handleRefreshPrice removed to prevent loop based on its own changes
+  }, [activeTab, allAssets, initialRefreshPerformedForTab, handleRefreshPrice]); // handleRefreshPrice added back to dependencies
 
 
   const handleSaveAsset = () => {
@@ -222,9 +237,11 @@ export default function AssetsPage() {
     }
 
     const quantityToSave = (currentAsset.category === 'bank' || currentAsset.category === 'property') ? 1 : (Number(currentAsset.quantity) || 0);
+    const finalTickerSymbol = isTrackableCategory ? tickerSearchQuery.toUpperCase() : undefined;
+
 
     if (isTrackableCategory) {
-        if (!currentAsset.tickerSymbol) {
+        if (!finalTickerSymbol) {
             toast({ title: "Error", description: "Ticker symbol is required for stocks, crypto, and mutual funds.", variant: "destructive" });
             return;
         }
@@ -232,8 +249,8 @@ export default function AssetsPage() {
             toast({ title: "Error", description: "Purchase price must be zero or positive for trackable assets.", variant: "destructive" });
             return;
         }
-    } else { // Bank or Property
-        if (currentAsset.currentPrice === undefined || currentAsset.currentPrice < 0) { // This is currentPrice from form, not the fetched one
+    } else { 
+        if (currentAsset.currentPrice === undefined || currentAsset.currentPrice < 0) { 
             toast({ title: "Error", description: "Current value must be zero or positive for bank accounts and property.", variant: "destructive" });
             return;
         }
@@ -250,9 +267,9 @@ export default function AssetsPage() {
         quantity: quantityToSave,
       };
       if (isTrackableCategory) {
-        payloadForUpdate.tickerSymbol = currentAsset.tickerSymbol;
+        payloadForUpdate.tickerSymbol = finalTickerSymbol;
         payloadForUpdate.purchasePrice = Number(currentAsset.purchasePrice) || 0;
-      } else { // Bank or Property - only currentPrice (aka balance/value) from form
+      } else { 
         payloadForUpdate.currentPrice = Number(currentAsset.currentPrice) || 0;
       }
       updateAsset(payloadForUpdate);
@@ -266,8 +283,8 @@ export default function AssetsPage() {
       };
       if (isTrackableCategory) {
         newAssetPayload.purchasePrice = Number(currentAsset.purchasePrice) || 0;
-        newAssetPayload.tickerSymbol = currentAsset.tickerSymbol;
-      } else { // Bank or Property
+        newAssetPayload.tickerSymbol = finalTickerSymbol;
+      } else { 
         newAssetPayload.currentPrice = Number(currentAsset.currentPrice) || 0;
       }
       addedAssetWithId = addAsset(newAssetPayload);
@@ -275,11 +292,11 @@ export default function AssetsPage() {
     }
     setIsFormOpen(false);
     setCurrentAsset(initialAssetFormState);
+    setTickerSearchQuery('');
+    setTickerSuggestions([]);
 
     if (addedAssetWithId && isTrackableCategory && addedAssetWithId.tickerSymbol) {
-        // After adding a new trackable asset, refresh its price
         handleRefreshPrice(addedAssetWithId);
-        // Reset the 'initialRefreshPerformedForTab' for the asset's category so it refreshes on next tab view if needed
         if (addedAssetWithId.category) {
            setInitialRefreshPerformedForTab(prev => ({ ...prev, [addedAssetWithId!.category as string]: false }));
         }
@@ -337,19 +354,79 @@ export default function AssetsPage() {
 
     if (isNewCategoryTrackable) {
         newState.tickerSymbol = currentAsset?.tickerSymbol || '';
+        setTickerSearchQuery(currentAsset?.tickerSymbol || '');
         newState.purchasePrice = currentAsset?.purchasePrice === undefined ? 0 : currentAsset.purchasePrice;
         newState.quantity = currentAsset?.quantity === undefined || currentAsset.quantity === 1 ? 1 : currentAsset.quantity;
-         // Remove currentPrice field from form state if switching from bank/property to trackable
         if (currentAsset?.category === 'bank' || currentAsset?.category === 'property') {
           delete newState.currentPrice;
         }
-    } else { // Bank or Property
-        newState.currentPrice = currentAsset?.currentPrice === undefined ? 0 : currentAsset.currentPrice; // This is for the form input
-        newState.quantity = 1; // Bank/Property quantity is always 1
+    } else { 
+        newState.currentPrice = currentAsset?.currentPrice === undefined ? 0 : currentAsset.currentPrice; 
+        newState.quantity = 1; 
         delete newState.tickerSymbol;
+        setTickerSearchQuery('');
         delete newState.purchasePrice;
     }
     setCurrentAsset(newState);
+    setTickerSuggestions([]);
+    setShowTickerSuggestionsPopover(false);
+  };
+
+  // Debounce function
+  const debounce = <F extends (...args: any[]) => void>(func: F, delay: number) => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    return (...args: Parameters<F>) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        func(...args);
+      }, delay);
+    };
+  };
+
+  const performTickerSearch = useCallback(async (query: string) => {
+    if (!query || query.trim().length < 1) {
+      setTickerSuggestions([]);
+      setShowTickerSuggestionsPopover(false);
+      return;
+    }
+    setIsTickerSearching(true);
+    try {
+      const results = await searchTickerSymbols(query);
+      setTickerSuggestions(results);
+    } catch (error) {
+      console.error("Ticker search failed:", error);
+      setTickerSuggestions([]);
+      toast({ title: "Search Error", description: "Could not fetch ticker suggestions.", variant: "destructive" });
+    } finally {
+      setIsTickerSearching(false);
+      setShowTickerSuggestionsPopover(true); // Show popover even if no results to display "No results"
+    }
+  }, [toast]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedTickerSearch = useCallback(debounce(performTickerSearch, 500), [performTickerSearch]);
+
+  const handleTickerInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setTickerSearchQuery(query);
+    setCurrentAsset(prev => ({ ...prev, tickerSymbol: query.toUpperCase() }));
+    if (query.trim().length > 0) {
+      debouncedTickerSearch(query);
+    } else {
+      setTickerSuggestions([]);
+      setShowTickerSuggestionsPopover(false);
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: TickerSuggestion) => {
+    setCurrentAsset(prev => ({
+      ...prev,
+      tickerSymbol: suggestion.symbol,
+      name: prev?.name || suggestion.name, // Prefer existing name if user typed one
+    }));
+    setTickerSearchQuery(suggestion.symbol);
+    setTickerSuggestions([]);
+    setShowTickerSuggestionsPopover(false);
   };
 
 
@@ -392,7 +469,7 @@ export default function AssetsPage() {
       const totalPurchaseCostForAsset = asset.purchasePrice * asset.quantity;
        if (totalPurchaseCostForAsset !== 0) {
          allTimeGainLossPercent = (allTimeGainLoss / totalPurchaseCostForAsset) * 100;
-       } else if (allTimeGainLoss !== 0) { // Gain with zero cost (e.g. airdrop)
+       } else if (allTimeGainLoss !== 0) { 
          allTimeGainLossPercent = allTimeGainLoss > 0 ? Infinity : -Infinity;
        }
     }
@@ -416,7 +493,7 @@ export default function AssetsPage() {
                 {asset.quantity.toLocaleString()} { asset.category === 'stock' ? 'shares' : asset.category === 'crypto' ? 'coins' : 'units'} @ {formatCurrency(asset.currentPrice, asset.currency)}/unit
               </p>
             )}
-             {!isTrackableAsset && ( // Bank or Property
+             {!isTrackableAsset && ( 
               <p className="text-xs text-muted-foreground">
                 Current Value
               </p>
@@ -521,7 +598,15 @@ export default function AssetsPage() {
             Track your investments and net worth across different categories.
           </p>
         </div>
-        <Dialog open={isFormOpen} onOpenChange={(isOpen) => { setIsFormOpen(isOpen); if (!isOpen) setCurrentAsset(initialAssetFormState);}}>
+        <Dialog open={isFormOpen} onOpenChange={(isOpen) => { 
+            setIsFormOpen(isOpen); 
+            if (!isOpen) {
+                setCurrentAsset(initialAssetFormState); 
+                setTickerSearchQuery(''); 
+                setTickerSuggestions([]);
+                setShowTickerSuggestionsPopover(false);
+            }
+        }}>
         <DialogTrigger asChild>
             <Button onClick={() => openForm()}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Asset
@@ -540,9 +625,6 @@ export default function AssetsPage() {
                 <Label htmlFor="name" className="text-right">{currentAssetLabels.name}</Label>
                 <div className="col-span-3">
                 <Input id="name" value={currentAsset?.name || ''} onChange={(e) => setCurrentAsset({...currentAsset, name: e.target.value })} placeholder={`e.g. ${currentAsset?.category === 'bank' ? 'Main Savings' : currentAsset?.category === 'property' ? 'Downtown Condo' : currentAsset?.category === 'stock' ? 'Apple Inc.' : currentAsset?.category === 'crypto' ? 'Bitcoin' : 'Vanguard S&P 500 ETF'}`} />
-                <p className="text-xs text-muted-foreground mt-1">
-                    Dynamic name suggestions are planned for a future update.
-                </p>
                 </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
@@ -580,13 +662,60 @@ export default function AssetsPage() {
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="tickerSymbol" className="text-right">{currentAssetLabels.ticker}</Label>
                     <div className="col-span-3">
-                    <Input id="tickerSymbol" value={currentAsset?.tickerSymbol || ''} onChange={(e) => setCurrentAsset({...currentAsset, tickerSymbol: e.target.value.toUpperCase() })} placeholder={currentAsset?.category === 'stock' ? 'e.g. AAPL' : currentAsset?.category === 'crypto' ? 'e.g. BTCUSD' : 'e.g. VOO'} />
+                    <Popover open={showTickerSuggestionsPopover && tickerSuggestions.length > 0 && tickerSearchQuery.length > 0} onOpenChange={(isOpen) => {
+                        if (!isOpen) {
+                            // Allow clicking on suggestions before popover closes
+                            setTimeout(() => setShowTickerSuggestionsPopover(false), 100);
+                        }
+                    }}>
+                        <PopoverAnchor asChild>
+                           <div ref={tickerInputRef} />
+                        </PopoverAnchor>
+                        <PopoverTrigger asChild>
+                            <Input 
+                                id="tickerSymbol" 
+                                value={tickerSearchQuery} 
+                                onChange={handleTickerInputChange}
+                                onFocus={() => {
+                                    if(tickerSearchQuery.trim().length > 0 && tickerSuggestions.length > 0) {
+                                        setShowTickerSuggestionsPopover(true);
+                                    }
+                                }}
+                                placeholder={currentAsset?.category === 'stock' ? 'e.g. AAPL' : currentAsset?.category === 'crypto' ? 'e.g. BTCUSD' : 'e.g. VOO'} 
+                             />
+                        </PopoverTrigger>
+                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom" align="start">
+                            {isTickerSearching && (
+                                <div className="p-2 text-sm text-muted-foreground flex items-center justify-center">
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Searching...
+                                </div>
+                            )}
+                            {!isTickerSearching && tickerSuggestions.length === 0 && tickerSearchQuery.length > 0 && (
+                                <div className="p-2 text-sm text-muted-foreground text-center">No results found.</div>
+                            )}
+                            {!isTickerSearching && tickerSuggestions.length > 0 && (
+                                <div className="max-h-48 overflow-y-auto">
+                                    {tickerSuggestions.map((suggestion, index) => (
+                                        <Button
+                                            key={index}
+                                            variant="ghost"
+                                            className="w-full justify-start p-2 text-left h-auto rounded-none"
+                                            onClick={() => handleSuggestionClick(suggestion)}
+                                        >
+                                            <div className="flex flex-col">
+                                                <span className="font-semibold">{suggestion.symbol}</span>
+                                                <span className="text-xs text-muted-foreground">{suggestion.name}</span>
+                                            </div>
+                                        </Button>
+                                    ))}
+                                </div>
+                            )}
+                        </PopoverContent>
+                    </Popover>
                     <p className="text-xs text-muted-foreground mt-1">
                         For stocks, use the official ticker (e.g., GOOGL, MSFT). For crypto, use symbol with 'USD' (e.g., BTCUSD, ETHUSD) if prices are USD-based. For Indian mutual funds, use the scheme code if known.
                         <br/>
-                        <Search className="inline h-3 w-3 mr-1" />Tip: Search online for "[Company/Crypto Name] ticker symbol" or "[Fund Name] scheme code".
-                        <br/>
-                        Automatic ticker fetching from name is planned.
+                        <Search className="inline h-3 w-3 mr-1" />Tip: Search online for "[Company/Crypto Name] ticker symbol" or "[Fund Name] scheme code". Type to search for tickers.
                     </p>
                     </div>
                 </div>
@@ -604,7 +733,13 @@ export default function AssetsPage() {
             )}
             </div>
             <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); setCurrentAsset(initialAssetFormState);}}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => { 
+                setIsFormOpen(false); 
+                setCurrentAsset(initialAssetFormState); 
+                setTickerSearchQuery(''); 
+                setTickerSuggestions([]);
+                setShowTickerSuggestionsPopover(false);
+            }}>Cancel</Button>
             <Button type="submit" onClick={handleSaveAsset}>Save Asset</Button>
             </DialogFooter>
         </DialogContent>
@@ -691,12 +826,11 @@ export default function AssetsPage() {
                         const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
                             ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100
                             : (totalData.allTimeGain !== 0 ? Infinity : 0);
-                        const isTrackableCategory = category === 'stock' || category === 'crypto' || category === 'mutualfund';
+                        const isTrackableCategoryForTab = category === 'stock' || category === 'crypto' || category === 'mutualfund';
 
-                        // Only render if there are assets in this currency and category, or if there's a market value for this currency in this category.
                         const assetsInThisCurrencyAndCategory = allAssets.filter(a => a.category === category && a.currency === currency);
                         if (assetsInThisCurrencyAndCategory.length === 0 && totalData.marketValue === 0) {
-                            return null; // Don't render summary if no assets and no value for this currency in this category
+                            return null; 
                         }
 
                         return (
@@ -704,7 +838,7 @@ export default function AssetsPage() {
                             <p className="text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
                                 <span className="text-sm text-muted-foreground ml-1">({currency} Total {categoryDisplayNames[category].toLowerCase()})</span>
                             </p>
-                            {isTrackableCategory && (
+                            {isTrackableCategoryForTab && (
                                 <>
                                     {(totalData.dailyGain !== 0) && (
                                         <div className="text-sm flex items-center mt-1">
@@ -732,7 +866,7 @@ export default function AssetsPage() {
                             </div>
                         );
                     })}
-                     {allAssets.filter(a => a.category === category).length === 0 && ( // Show this if no assets exist in this category at all
+                     {allAssets.filter(a => a.category === category).length === 0 && ( 
                         <p className="text-muted-foreground">No assets in this category yet. Add one using the button above.</p>
                     )}
                     </CardContent>
@@ -756,7 +890,7 @@ export default function AssetsPage() {
                  {displayedAssets.length > 0 && (
                   <div className="mt-4 text-xs text-muted-foreground">
                     <Info className="inline h-3 w-3 mr-1" />
-                    Price history charts show mock data. Real-time price fetching is active for stocks via Alpha Vantage (API limits apply); crypto and mutual funds use mock prices.
+                    Price history charts show mock data. Real-time price fetching may use mock data if API limits are reached or for unsupported assets.
                   </div>
                 )}
             </TabsContent>
@@ -765,3 +899,4 @@ export default function AssetsPage() {
     </div>
   );
 }
+
