@@ -1,11 +1,10 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -77,6 +76,7 @@ export default function AssetsPage() {
   const [isTickerSearching, setIsTickerSearching] = useState(false);
   const [showTickerSuggestionsPopover, setShowTickerSuggestionsPopover] = useState(false);
 
+
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -97,9 +97,6 @@ export default function AssetsPage() {
     } else {
       params.set('category', newTabValue);
     }
-    // Reset initial refresh flag for all tabs when overview is selected or when navigating
-    // This way, the first time a category tab is entered after this, it will refresh.
-    setInitialRefreshPerformedForTab({});
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
@@ -107,7 +104,7 @@ export default function AssetsPage() {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return [];
+    return []; // For overview tab, no individual assets are listed directly under it.
   }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
@@ -121,12 +118,19 @@ export default function AssetsPage() {
       setTickerSearchQuery(asset.tickerSymbol || '');
     } else {
       const prefilledCategory = (activeTab && activeTab !== 'overview') ? activeTab : 'stock';
-      const newInitialState = {
+      const newInitialState: Partial<ContextAsset> = {
         ...initialAssetFormState,
         category: prefilledCategory as AssetCategory,
-        quantity: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? 1 : 1,
-        purchasePrice: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? undefined : 0,
-        tickerSymbol: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? undefined : '',
+        currency: 'USD', // Default currency
+      };
+      if (prefilledCategory === 'bank' || prefilledCategory === 'property') {
+        newInitialState.quantity = 1;
+        delete newInitialState.purchasePrice;
+        delete newInitialState.tickerSymbol;
+      } else {
+        newInitialState.quantity = 1;
+        newInitialState.purchasePrice = 0;
+        newInitialState.tickerSymbol = '';
       }
       setCurrentAsset(newInitialState);
       setTickerSearchQuery(newInitialState.tickerSymbol || '');
@@ -137,6 +141,11 @@ export default function AssetsPage() {
   };
 
   const handleRefreshPrice = useCallback(async (asset: ContextAsset) => {
+    if (!asset || !asset.id) {
+      console.error("handleRefreshPrice called with invalid asset:", asset);
+      return;
+    }
+
     if (asset.category === 'bank' || asset.category === 'property') {
       toast({ title: "Manual Update", description: `${asset.name} value is updated manually or via statements.`, variant: "default" });
       updateAssetPrice(asset.id, {
@@ -160,11 +169,11 @@ export default function AssetsPage() {
         return;
     }
 
-    setIsFetchingPrice(prev => ({ ...prev, [asset.id]: true }));
+    setIsFetchingPrice(prev => ({ ...prev, [asset.id!]: true }));
     let priceData;
     try {
       priceData = await fetchAssetPrice(asset.category, asset.tickerSymbol, asset.currency);
-      updateAssetPrice(asset.id, priceData);
+      updateAssetPrice(asset.id!, priceData);
       if (!priceData.priceFetchError?.toLowerCase().includes("error") && !priceData.priceFetchError?.toLowerCase().includes("failed")) {
         if (!(priceData.priceFetchError?.includes("mock data") || priceData.priceFetchError?.includes("Manual value"))) {
              toast({ title: "Price Updated", description: `Price for ${asset.name} refreshed.` });
@@ -179,21 +188,21 @@ export default function AssetsPage() {
       }
       console.error("Failed to fetch price:", error);
       toast({ title: "Fetch Error", description: detailedError, variant: "destructive" });
-      updateAssetPrice(asset.id, {
+      updateAssetPrice(asset.id!, {
         currentPrice: asset.currentPrice || 0,
         previousClosePrice: asset.previousClosePrice || asset.currentPrice || 0,
         priceHistory: asset.priceHistory,
         priceFetchError: detailedError
       });
     } finally {
-      setIsFetchingPrice(prev => ({ ...prev, [asset.id]: false }));
+      setIsFetchingPrice(prev => ({ ...prev, [asset.id!]: false }));
     }
   }, [toast, updateAssetPrice]);
 
 
  useEffect(() => {
     const performTabRefresh = async () => {
-        if (activeTab === 'overview' || !activeTab || initialRefreshPerformedForTab[activeTab]) {
+        if (activeTab === 'overview' || !activeTab || initialRefreshPerformedForTab[activeTab] || !allAssets.length) {
             return;
         }
 
@@ -206,21 +215,20 @@ export default function AssetsPage() {
 
         if (assetsInTabToRefresh.length > 0) {
             for (const asset of assetsInTabToRefresh) {
-                if (!isFetchingPrice[asset.id]) {
+                if (!isFetchingPrice[asset.id]) { // Check if already fetching
                     await handleRefreshPrice(asset);
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Stagger API calls
                 }
             }
         }
         setInitialRefreshPerformedForTab(prev => ({ ...prev, [activeTab]: true }));
     };
 
-    if (allAssets.length > 0 && activeTab !== 'overview') {
-        performTabRefresh();
+    if (activeTab !== 'overview') {
+      performTabRefresh();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, allAssets, handleRefreshPrice]);
-
+  }, [activeTab, allAssets, initialRefreshPerformedForTab]); // Removed handleRefreshPrice, isFetchingPrice to prevent loops
 
   const handleSaveAsset = () => {
     if (!currentAsset || !currentAsset.name || !currentAsset.category || !currentAsset.currency) {
@@ -250,7 +258,7 @@ export default function AssetsPage() {
             toast({ title: "Error", description: "Purchase price must be zero or positive for trackable assets.", variant: "destructive" });
             return;
         }
-    } else {
+    } else { // Bank or Property
         if (currentAsset.currentPrice === undefined || currentAsset.currentPrice < 0) {
             toast({ title: "Error", description: "Current value must be zero or positive for bank accounts and property.", variant: "destructive" });
             return;
@@ -285,21 +293,27 @@ export default function AssetsPage() {
       if (isTrackableCategory) {
         newAssetPayload.purchasePrice = Number(currentAsset.purchasePrice) || 0;
         newAssetPayload.tickerSymbol = finalTickerSymbol;
-      } else {
+      } else { // Bank or property
         newAssetPayload.currentPrice = Number(currentAsset.currentPrice) || 0;
       }
-      addedAssetWithId = addAsset(newAssetPayload);
+      addedAssetWithId = addAsset(newAssetPayload); // Assuming addAsset returns the full new asset with ID
       toast({ title: "Asset Added", description: `${newAssetPayload.name} has been added.` });
     }
     setIsFormOpen(false);
     setCurrentAsset(initialAssetFormState);
     setTickerSearchQuery('');
     setTickerSuggestions([]);
+    setShowTickerSuggestionsPopover(false);
 
     if (addedAssetWithId && isTrackableCategory && addedAssetWithId.tickerSymbol) {
         handleRefreshPrice(addedAssetWithId);
         if (addedAssetWithId.category) {
            setInitialRefreshPerformedForTab(prev => ({ ...prev, [addedAssetWithId!.category as string]: false }));
+        }
+    } else if (currentAsset.id && isTrackableCategory) { // If editing an existing trackable asset
+        const existingAsset = allAssets.find(a => a.id === currentAsset.id);
+        if (existingAsset && (existingAsset.tickerSymbol !== finalTickerSymbol || existingAsset.currency !== currentAsset.currency)) {
+            handleRefreshPrice({...existingAsset, tickerSymbol: finalTickerSymbol, currency: currentAsset.currency!});
         }
     }
   };
@@ -355,21 +369,19 @@ export default function AssetsPage() {
 
     if (isNewCategoryTrackable) {
         newState.tickerSymbol = currentAsset?.tickerSymbol || '';
-        setTickerSearchQuery(currentAsset?.tickerSymbol || '');
+        setTickerSearchQuery(currentAsset?.tickerSymbol || ''); // Keep existing ticker if applicable
         newState.purchasePrice = currentAsset?.purchasePrice === undefined ? 0 : currentAsset.purchasePrice;
-        newState.quantity = currentAsset?.quantity === undefined || currentAsset.quantity === 1 ? 1 : currentAsset.quantity;
-        if (currentAsset?.category === 'bank' || currentAsset?.category === 'property') {
-          delete newState.currentPrice;
-        }
-    } else {
+        newState.quantity = (currentAsset?.quantity === undefined || (currentAsset.quantity === 1 && (currentAsset.category === 'bank' || currentAsset.category === 'property'))) ? 1 : currentAsset.quantity;
+        delete newState.currentPrice; // Remove currentPrice as it's fetched
+    } else { // Bank or Property
         newState.currentPrice = currentAsset?.currentPrice === undefined ? 0 : currentAsset.currentPrice;
-        newState.quantity = 1;
+        newState.quantity = 1; // Bank/Property always quantity 1
         delete newState.tickerSymbol;
         setTickerSearchQuery('');
         delete newState.purchasePrice;
     }
     setCurrentAsset(newState);
-    setTickerSuggestions([]);
+    setTickerSuggestions([]); // Clear suggestions on category change
     setShowTickerSuggestionsPopover(false);
   };
 
@@ -390,17 +402,17 @@ export default function AssetsPage() {
       return;
     }
     setIsTickerSearching(true);
-    setShowTickerSuggestionsPopover(true); // Show popover for loading/no results
     try {
       const results = await searchTickerSymbols(query);
       setTickerSuggestions(results);
+      setShowTickerSuggestionsPopover(results.length > 0 || query.trim().length > 0);
     } catch (error) {
       console.error("Ticker search failed:", error);
       setTickerSuggestions([]);
+      setShowTickerSuggestionsPopover(query.trim().length > 0); // Keep popover open to show error/no results
       toast({ title: "Search Error", description: "Could not fetch ticker suggestions.", variant: "destructive" });
     } finally {
       setIsTickerSearching(false);
-      // Popover visibility is managed based on results/query length by open prop
     }
   }, [toast]);
 
@@ -419,12 +431,12 @@ export default function AssetsPage() {
   };
 
   const handleSuggestionClick = (suggestion: TickerSuggestion) => {
+    setTickerSearchQuery(suggestion.symbol);
     setCurrentAsset(prev => ({
       ...prev,
       tickerSymbol: suggestion.symbol,
-      name: prev?.name || suggestion.name,
+      name: prev?.name || suggestion.name, // Auto-fill name if empty
     }));
-    setTickerSearchQuery(suggestion.symbol);
     setTickerSuggestions([]);
     setShowTickerSuggestionsPopover(false);
   };
@@ -469,7 +481,7 @@ export default function AssetsPage() {
       const totalPurchaseCostForAsset = asset.purchasePrice * asset.quantity;
        if (totalPurchaseCostForAsset !== 0) {
          allTimeGainLossPercent = (allTimeGainLoss / totalPurchaseCostForAsset) * 100;
-       } else if (allTimeGainLoss !== 0) {
+       } else if (allTimeGainLoss !== 0) { // Gain on zero cost (e.g. airdrop)
          allTimeGainLossPercent = allTimeGainLoss > 0 ? Infinity : -Infinity;
        }
     }
@@ -480,7 +492,7 @@ export default function AssetsPage() {
           <div>
             <CardTitle className="text-lg">{asset.name}</CardTitle>
             <CardDescription className="capitalize">
-              {asset.category} {asset.tickerSymbol && `(${asset.tickerSymbol})`} - {asset.currency}
+              {categoryDisplayNames[asset.category]} {asset.tickerSymbol && `(${asset.tickerSymbol})`} - {asset.currency}
             </CardDescription>
           </div>
           {assetIcons[asset.category]}
@@ -493,7 +505,7 @@ export default function AssetsPage() {
                 {asset.quantity.toLocaleString()} { asset.category === 'stock' ? 'shares' : asset.category === 'crypto' ? 'coins' : 'units'} @ {formatCurrency(asset.currentPrice, asset.currency)}/unit
               </p>
             )}
-             {!isTrackableAsset && (
+             {!isTrackableAsset && ( // For Bank & Property
               <p className="text-xs text-muted-foreground">
                 Current Value
               </p>
@@ -579,9 +591,9 @@ export default function AssetsPage() {
   };
 
   const assetLabelMap: Record<AssetCategory, { name: string, quantity: string, purchasePrice: string, ticker: string }> = {
-    stock: { name: "Company Name", quantity: "Number of Shares", purchasePrice: "Purchase Price per Share", ticker: "Ticker Symbol (e.g. AAPL, GOOG)" },
-    crypto: { name: "Cryptocurrency Name", quantity: "Quantity Owned", purchasePrice: "Purchase Price per Unit", ticker: "Symbol (e.g. BTC, ETH)" },
-    mutualfund: { name: "Fund Name", quantity: "Units Held", purchasePrice: "Purchase Price per Unit", ticker: "Symbol (e.g. VTSAX)" },
+    stock: { name: "Company Name", quantity: "Number of Shares", purchasePrice: "Purchase Price per Share", ticker: "Ticker Symbol" },
+    crypto: { name: "Cryptocurrency Name", quantity: "Quantity Owned", purchasePrice: "Purchase Price per Unit", ticker: "Symbol" },
+    mutualfund: { name: "Fund Name", quantity: "Units Held", purchasePrice: "Purchase Price per Unit", ticker: "Symbol" },
     bank: { name: "Account Nickname", quantity: "N/A", purchasePrice: "N/A", ticker: "N/A" },
     property: { name: "Property Name", quantity: "N/A", purchasePrice: "N/A", ticker: "N/A" },
   };
@@ -593,14 +605,14 @@ export default function AssetsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Assets</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Asset Portfolio</h1>
           <p className="text-muted-foreground">
             Track your investments and net worth across different categories.
           </p>
         </div>
         <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
             setIsFormOpen(isOpen);
-            if (!isOpen) {
+            if (!isOpen) { // Reset form state on close
                 setCurrentAsset(initialAssetFormState);
                 setTickerSearchQuery('');
                 setTickerSuggestions([]);
@@ -660,21 +672,17 @@ export default function AssetsPage() {
             {isCurrentAssetTrackable && (
                 <>
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="tickerSymbol" className="text-right">{currentAssetLabels.ticker}</Label>
+                    <Label htmlFor="tickerSymbolInput" className="text-right">{currentAssetLabels.ticker}</Label>
                     <div className="col-span-3">
-                    <Popover open={showTickerSuggestionsPopover && tickerSearchQuery.length > 0} onOpenChange={(isOpen) => {
-                        if (!isOpen) {
-                           setTimeout(() => setShowTickerSuggestionsPopover(false), 100);
-                        }
-                    }}>
+                    <Popover open={showTickerSuggestionsPopover} onOpenChange={setShowTickerSuggestionsPopover}>
                         <PopoverTrigger asChild>
                             <Input
-                                id="tickerSymbol"
+                                id="tickerSymbolInput"
                                 value={tickerSearchQuery}
                                 onChange={handleTickerInputChange}
                                 onFocus={() => {
-                                    if(tickerSearchQuery.trim().length > 0 && tickerSuggestions.length > 0) {
-                                        setShowTickerSuggestionsPopover(true);
+                                    if (tickerSearchQuery.trim().length > 0 && tickerSuggestions.length > 0) {
+                                      setShowTickerSuggestionsPopover(true);
                                     }
                                 }}
                                 placeholder={currentAsset?.category === 'stock' ? 'e.g. AAPL' : currentAsset?.category === 'crypto' ? 'e.g. BTCUSD' : 'e.g. VOO'}
@@ -736,7 +744,7 @@ export default function AssetsPage() {
             <DialogFooter>
             <Button type="button" variant="outline" onClick={() => {
                 setIsFormOpen(false);
-                setCurrentAsset(initialAssetFormState);
+                setCurrentAsset(initialAssetFormState); // Reset on cancel
                 setTickerSearchQuery('');
                 setTickerSuggestions([]);
                 setShowTickerSuggestionsPopover(false);
@@ -830,7 +838,7 @@ export default function AssetsPage() {
                         const isTrackableCategoryForTab = category === 'stock' || category === 'crypto' || category === 'mutualfund';
 
                         const assetsInThisCurrencyAndCategory = allAssets.filter(a => a.category === category && a.currency === currency);
-                        if (assetsInThisCurrencyAndCategory.length === 0 && totalData.marketValue === 0) {
+                        if (assetsInThisCurrencyAndCategory.length === 0 && totalData.marketValue === 0) { // Don't show if no assets AND no value for this currency/category
                             return null;
                         }
 
@@ -867,7 +875,7 @@ export default function AssetsPage() {
                             </div>
                         );
                     })}
-                     {allAssets.filter(a => a.category === category).length === 0 && (
+                     {allAssets.filter(a => a.category === category).length === 0 && ( // Show if there are no assets in this category at all
                         <p className="text-muted-foreground">No assets in this category yet. Add one using the button above.</p>
                     )}
                     </CardContent>
@@ -883,7 +891,7 @@ export default function AssetsPage() {
                     </Card>
                 )}
 
-                <div className="grid gap-6 md:grid-cols-1">
+                <div className="grid gap-6 md:grid-cols-1"> {/* Ensure single column for asset cards within tabs */}
                     {displayedAssets.map((asset) => (
                         <AssetCardComponent key={asset.id} asset={asset} />
                     ))}
@@ -900,4 +908,3 @@ export default function AssetsPage() {
     </div>
   );
 }
-
