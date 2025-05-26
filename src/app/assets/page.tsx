@@ -10,8 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; // Popover still used for other things potentially, or can be removed if not.
-import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, AlertTriangle, Search, Loader2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, ExternalLink, AlertTriangle, Search, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
@@ -68,7 +68,7 @@ export default function AssetsPage() {
   const { toast } = useToast();
   const { assets: allAssets, addAsset, updateAsset, deleteAsset: deleteAssetFromContext, updateAssetPrice, getAssetMarketValue } = useAssets();
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [currentAsset, setCurrentAsset] = useState<Partial<ContextAsset>>(initialAssetFormState);
+  const [currentAssetForForm, setCurrentAssetForForm] = useState<Partial<ContextAsset>>(initialAssetFormState);
   const [isFetchingPrice, setIsFetchingPrice] = useState<Record<string, boolean>>({});
   const [initialRefreshPerformedForTab, setInitialRefreshPerformedForTab] = useState<Record<string, boolean>>({});
 
@@ -93,29 +93,33 @@ export default function AssetsPage() {
       params.set('category', newTabValue);
     }
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
+     // Reset refresh flag for the new tab so it refreshes on first view
+    if (newTabValue !== 'overview') {
+      setInitialRefreshPerformedForTab(prev => ({ ...prev, [newTabValue]: false }));
+    }
   };
 
   const displayedAssets = useMemo(() => {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return []; 
+    return [];
   }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
-    if (!currentAsset || !currentAsset.category) return false;
-    return currentAsset.category === 'stock' || currentAsset.category === 'crypto' || currentAsset.category === 'mutualfund';
-  }, [currentAsset]);
+    if (!currentAssetForForm || !currentAssetForForm.category) return false;
+    return currentAssetForForm.category === 'stock' || currentAssetForForm.category === 'crypto' || currentAssetForForm.category === 'mutualfund';
+  }, [currentAssetForForm]);
 
   const openForm = (asset?: ContextAsset) => {
     if (asset) {
-      setCurrentAsset({ ...asset });
+      setCurrentAssetForForm({ ...asset });
     } else {
       const prefilledCategory = (activeTab && activeTab !== 'overview') ? activeTab : 'stock';
       const newInitialState: Partial<ContextAsset> = {
         ...initialAssetFormState,
         category: prefilledCategory as AssetCategory,
-        currency: 'USD', 
+        currency: 'USD',
       };
       if (prefilledCategory === 'bank' || prefilledCategory === 'property') {
         newInitialState.quantity = 1;
@@ -126,59 +130,60 @@ export default function AssetsPage() {
         newInitialState.purchasePrice = 0;
         newInitialState.tickerSymbol = '';
       }
-      setCurrentAsset(newInitialState);
+      setCurrentAssetForForm(newInitialState);
     }
     setIsFormOpen(true);
   };
 
-  const handleRefreshPrice = useCallback(async (asset: ContextAsset) => {
-    if (!asset || !asset.id) {
-      console.error("handleRefreshPrice called with invalid asset:", asset);
+  const handleRefreshPrice = useCallback(async (assetToRefresh: ContextAsset) => {
+    if (!assetToRefresh || !assetToRefresh.id) {
+      console.error("[AssetsPage] handleRefreshPrice called with invalid asset:", assetToRefresh);
       return;
     }
 
-    if (asset.category === 'bank' || asset.category === 'property') {
-        updateAssetPrice(asset.id, {
-            currentPrice: asset.currentPrice || 0,
-            previousClosePrice: asset.previousClosePrice || asset.currentPrice || 0,
-            priceHistory: asset.priceHistory || [{ date: new Date().toISOString().split('T')[0], price: asset.currentPrice || 0 }],
+    if (assetToRefresh.category === 'bank' || assetToRefresh.category === 'property') {
+        updateAssetPrice(assetToRefresh.id, {
+            currentPrice: assetToRefresh.currentPrice || 0,
+            previousClosePrice: assetToRefresh.previousClosePrice || assetToRefresh.currentPrice || 0,
+            priceHistory: assetToRefresh.priceHistory || [{ date: new Date().toISOString().split('T')[0], price: assetToRefresh.currentPrice || 0 }],
             priceFetchError: "Manual value."
         });
       return;
     }
 
-    if (!asset.tickerSymbol && (asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund')) {
-        const missingTickerError = `Ticker missing for ${asset.name}. Cannot refresh price. Please edit the asset and add a valid ticker.`;
-        updateAssetPrice(asset.id, {
-            currentPrice: asset.currentPrice || 0,
-            previousClosePrice: asset.previousClosePrice || asset.currentPrice || 0,
-            priceHistory: asset.priceHistory,
+    if (!assetToRefresh.tickerSymbol && (assetToRefresh.category === 'stock' || assetToRefresh.category === 'crypto' || assetToRefresh.category === 'mutualfund')) {
+        const missingTickerError = `Ticker missing for ${assetToRefresh.name}. Cannot refresh price. Please edit the asset and add a valid ticker.`;
+        updateAssetPrice(assetToRefresh.id, {
+            currentPrice: assetToRefresh.currentPrice || 0,
+            previousClosePrice: assetToRefresh.previousClosePrice || assetToRefresh.currentPrice || 0,
+            priceHistory: assetToRefresh.priceHistory,
             priceFetchError: missingTickerError
         });
         return;
     }
 
-    setIsFetchingPrice(prev => ({ ...prev, [asset.id!]: true }));
+    setIsFetchingPrice(prev => ({ ...prev, [assetToRefresh.id!]: true }));
     let priceData;
     try {
-      priceData = await fetchAssetPrice(asset.category, asset.tickerSymbol, asset.currency);
-      updateAssetPrice(asset.id!, priceData);
+      console.log(`[AssetsPage] Calling fetchAssetPrice for: ID=${assetToRefresh.id}, Category=${assetToRefresh.category}, Ticker=${assetToRefresh.tickerSymbol}, Currency=${assetToRefresh.currency}`);
+      priceData = await fetchAssetPrice(assetToRefresh.category, assetToRefresh.tickerSymbol, assetToRefresh.currency);
+      updateAssetPrice(assetToRefresh.id!, priceData);
     } catch (error) {
       let detailedError = "Could not refresh price due to an unknown error.";
       if (error instanceof Error) {
-          detailedError = `Could not refresh price for ${asset.name}. Error: ${error.message}.`;
+          detailedError = `Could not refresh price for ${assetToRefresh.name}. Error: ${error.message}.`;
       }
-      console.error("Failed to fetch price:", error);
-      updateAssetPrice(asset.id!, {
-        currentPrice: asset.currentPrice || 0,
-        previousClosePrice: asset.previousClosePrice || asset.currentPrice || 0,
-        priceHistory: asset.priceHistory,
+      console.error("[AssetsPage] Failed to fetch price in handleRefreshPrice:", error);
+      updateAssetPrice(assetToRefresh.id!, {
+        currentPrice: assetToRefresh.currentPrice || 0,
+        previousClosePrice: assetToRefresh.previousClosePrice || assetToRefresh.currentPrice || 0,
+        priceHistory: assetToRefresh.priceHistory,
         priceFetchError: detailedError
       });
     } finally {
-      setIsFetchingPrice(prev => ({ ...prev, [asset.id!]: false }));
+      setIsFetchingPrice(prev => ({ ...prev, [assetToRefresh.id!]: false }));
     }
-  }, [updateAssetPrice]); // Removed toast from dependencies as it's not used here anymore
+  }, [updateAssetPrice]);
 
 
   useEffect(() => {
@@ -195,107 +200,107 @@ export default function AssetsPage() {
         );
 
         if (assetsInTabToRefresh.length > 0) {
-            console.log(`Refreshing ${assetsInTabToRefresh.length} assets in tab ${activeTab}`);
+            console.log(`[AssetsPage] Refreshing ${assetsInTabToRefresh.length} assets in tab ${activeTab}`);
             let refreshedCount = 0;
             for (const asset of assetsInTabToRefresh) {
-                if (!isFetchingPrice[asset.id]) { 
+                if (!isFetchingPrice[asset.id]) {
                     await handleRefreshPrice(asset);
                     refreshedCount++;
-                    if (refreshedCount < assetsInTabToRefresh.length) { 
-                      await new Promise(resolve => setTimeout(resolve, 500)); 
+                    if (refreshedCount < assetsInTabToRefresh.length) {
+                      await new Promise(resolve => setTimeout(resolve, 500));
                     }
                 }
             }
         }
         setInitialRefreshPerformedForTab(prev => ({ ...prev, [activeTab]: true }));
     };
-    
+
+    // Only perform tab refresh if no individual fetches are currently in progress
     if (activeTab !== 'overview' && !Object.values(isFetchingPrice).some(fetching => fetching)) {
       performTabRefresh();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, allAssets, handleRefreshPrice, initialRefreshPerformedForTab]);
+  }, [activeTab, allAssets, handleRefreshPrice, initialRefreshPerformedForTab]); // isFetchingPrice removed from deps to avoid loop
 
 
   const handleSaveAsset = () => {
-    if (!currentAsset || !currentAsset.name || !currentAsset.category || !currentAsset.currency) {
+    if (!currentAssetForForm || !currentAssetForForm.name || !currentAssetForForm.category || !currentAssetForForm.currency) {
       toast({ title: "Error", description: "Please fill name, category, and currency.", variant: "destructive" });
       return;
     }
 
-    const isTrackableCategory = currentAsset.category === 'stock' || currentAsset.category === 'crypto' || currentAsset.category === 'mutualfund';
-    
-    const finalName = currentAsset.name;
-    const quantityToSave = (currentAsset.category === 'bank' || currentAsset.category === 'property') ? 1 : (Number(currentAsset.quantity) || 0);
-    const finalTickerSymbol = isTrackableCategory ? currentAsset.tickerSymbol?.toUpperCase() : undefined;
+    const isTrackableCategory = currentAssetForForm.category === 'stock' || currentAssetForForm.category === 'crypto' || currentAssetForForm.category === 'mutualfund';
+
+    const finalName = currentAssetForForm.name;
+    const quantityToSave = (currentAssetForForm.category === 'bank' || currentAssetForForm.category === 'property') ? 1 : (Number(currentAssetForForm.quantity) || 0);
+    const finalTickerSymbol = isTrackableCategory ? currentAssetForForm.tickerSymbol?.toUpperCase() : undefined;
 
     if (isTrackableCategory) {
         if (!finalTickerSymbol) {
             toast({ title: "Error", description: "Ticker symbol is required for stocks, crypto, and mutual funds.", variant: "destructive" });
             return;
         }
-         if (currentAsset.quantity === undefined || currentAsset.quantity <= 0) {
+         if (currentAssetForForm.quantity === undefined || currentAssetForForm.quantity <= 0) {
             toast({ title: "Error", description: "Quantity must be greater than zero for trackable assets.", variant: "destructive" });
             return;
         }
-        if (currentAsset.purchasePrice === undefined || currentAsset.purchasePrice < 0) {
+        if (currentAssetForForm.purchasePrice === undefined || currentAssetForForm.purchasePrice < 0) {
             toast({ title: "Error", description: "Purchase price must be zero or positive for trackable assets.", variant: "destructive" });
             return;
         }
-    } else { 
-        if (currentAsset.currentPrice === undefined || currentAsset.currentPrice < 0) {
+    } else {
+        if (currentAssetForForm.currentPrice === undefined || currentAssetForForm.currentPrice < 0) {
             toast({ title: "Error", description: "Current value must be zero or positive for bank accounts and property.", variant: "destructive" });
             return;
         }
     }
 
     let addedAssetWithId: ContextAsset | undefined = undefined;
-    let existingAssetId: string | undefined = currentAsset.id;
-    let categoryOfSavedAsset = currentAsset.category;
+    let existingAssetId: string | undefined = currentAssetForForm.id;
+    let categoryOfSavedAsset = currentAssetForForm.category;
 
-    if (currentAsset.id) {
+    if (currentAssetForForm.id) {
       const payloadForUpdate: Partial<ContextAsset> & { id: string } = {
-        id: currentAsset.id,
+        id: currentAssetForForm.id,
         name: finalName,
-        category: currentAsset.category!,
-        currency: currentAsset.currency!,
+        category: currentAssetForForm.category!,
+        currency: currentAssetForForm.currency!,
         quantity: quantityToSave,
       };
       if (isTrackableCategory) {
         payloadForUpdate.tickerSymbol = finalTickerSymbol;
-        payloadForUpdate.purchasePrice = Number(currentAsset.purchasePrice) || 0;
+        payloadForUpdate.purchasePrice = Number(currentAssetForForm.purchasePrice) || 0;
       } else {
-        payloadForUpdate.currentPrice = Number(currentAsset.currentPrice) || 0;
+        payloadForUpdate.currentPrice = Number(currentAssetForForm.currentPrice) || 0;
       }
       updateAsset(payloadForUpdate);
       toast({ title: "Asset Updated", description: `${payloadForUpdate.name} has been updated.` });
     } else {
       const newAssetPayload: Omit<ContextAsset, 'id' | 'lastUpdated' | 'lastPriceUpdate' | 'priceHistory' | 'priceFetchError' | 'currentPrice' | 'previousClosePrice'> & { purchasePrice?: number; currentPrice?: number; tickerSymbol?: string; } = {
         name: finalName,
-        category: currentAsset.category!,
-        currency: currentAsset.currency!,
+        category: currentAssetForForm.category!,
+        currency: currentAssetForForm.currency!,
         quantity: quantityToSave,
       };
       if (isTrackableCategory) {
-        newAssetPayload.purchasePrice = Number(currentAsset.purchasePrice) || 0;
-        newAssetPayload.tickerSymbol = finalTickerSymbol; 
+        newAssetPayload.purchasePrice = Number(currentAssetForForm.purchasePrice) || 0;
+        newAssetPayload.tickerSymbol = finalTickerSymbol;
       } else {
-        newAssetPayload.currentPrice = Number(currentAsset.currentPrice) || 0;
+        newAssetPayload.currentPrice = Number(currentAssetForForm.currentPrice) || 0;
       }
       addedAssetWithId = addAsset(newAssetPayload);
-      existingAssetId = addedAssetWithId.id; 
+      existingAssetId = addedAssetWithId.id;
+      categoryOfSavedAsset = newAssetPayload.category;
       toast({ title: "Asset Added", description: `${newAssetPayload.name} has been added.` });
     }
     setIsFormOpen(false);
-    setCurrentAsset(initialAssetFormState);
+    setCurrentAssetForForm(initialAssetFormState);
 
     if (isTrackableCategory && existingAssetId) {
-        const assetToRefresh = allAssets.find(a => a.id === existingAssetId);
+        const assetToRefresh = addedAssetWithId ? addedAssetWithId : allAssets.find(a => a.id === existingAssetId);
         if (assetToRefresh) {
-             const effectiveAssetToRefresh = addedAssetWithId ? addedAssetWithId : {...assetToRefresh, name: finalName, tickerSymbol: finalTickerSymbol, currency: currentAsset.currency!};
+             const effectiveAssetToRefresh = addedAssetWithId ? addedAssetWithId : {...assetToRefresh, name: finalName, tickerSymbol: finalTickerSymbol, currency: currentAssetForForm.currency!};
              handleRefreshPrice(effectiveAssetToRefresh);
-        } else if (addedAssetWithId) { 
-             handleRefreshPrice(addedAssetWithId);
         }
         if (categoryOfSavedAsset) {
            setInitialRefreshPerformedForTab(prev => ({ ...prev, [categoryOfSavedAsset as string]: false }));
@@ -338,7 +343,7 @@ export default function AssetsPage() {
   }, [getAssetMarketValue]);
 
   const portfolioTotalsByCurrency = useMemo(() => calculateTotals(allAssets.filter(a => a.category !== 'bank' && a.category !== 'property' || a.currentPrice !== undefined)), [allAssets, calculateTotals]);
-  
+
   const categorySpecificTotals = useMemo(() => {
     if (activeTab && activeTab !== 'overview') {
       const filteredAssetsForTab = allAssets.filter(asset => asset.category === activeTab && (asset.category !== 'bank' && asset.category !== 'property' || asset.currentPrice !== undefined));
@@ -349,21 +354,21 @@ export default function AssetsPage() {
 
 
   const handleCategoryChangeInForm = (value: AssetCategory) => {
-    const newState: Partial<ContextAsset> = { ...currentAsset, category: value };
+    const newState: Partial<ContextAsset> = { ...currentAssetForForm, category: value };
     const isNewCategoryTrackable = value === 'stock' || value === 'crypto' || value === 'mutualfund';
 
     if (isNewCategoryTrackable) {
-        newState.purchasePrice = currentAsset?.purchasePrice === undefined ? 0 : currentAsset.purchasePrice;
-        newState.quantity = (currentAsset?.quantity === undefined || (currentAsset.quantity === 1 && (currentAsset.category === 'bank' || currentAsset.category === 'property'))) ? 1 : currentAsset.quantity;
-        newState.tickerSymbol = currentAsset?.tickerSymbol || ''; 
+        newState.purchasePrice = currentAssetForForm?.purchasePrice === undefined ? 0 : currentAssetForForm.purchasePrice;
+        newState.quantity = (currentAssetForForm?.quantity === undefined || (currentAssetForForm.quantity === 1 && (currentAssetForForm.category === 'bank' || currentAssetForForm.category === 'property'))) ? 1 : currentAssetForForm.quantity;
+        newState.tickerSymbol = currentAssetForForm?.tickerSymbol || '';
         delete newState.currentPrice;
     } else {
-        newState.currentPrice = currentAsset?.currentPrice === undefined ? 0 : currentAsset.currentPrice;
+        newState.currentPrice = currentAssetForForm?.currentPrice === undefined ? 0 : currentAssetForForm.currentPrice;
         newState.quantity = 1;
         delete newState.tickerSymbol;
         delete newState.purchasePrice;
     }
-    setCurrentAsset(newState);
+    setCurrentAssetForForm(newState);
   };
 
   const AssetCardComponent = ({ asset }: { asset: ContextAsset }) => {
@@ -377,7 +382,7 @@ export default function AssetsPage() {
       let priceUpdateText: string | null = null;
       if (asset.lastPriceUpdate) {
         priceUpdateText = `Price as of: ${new Date(asset.lastPriceUpdate).toLocaleTimeString()} ${new Date(asset.lastPriceUpdate).toLocaleDateString()}`;
-      } else if (isTrackableAsset && asset.currentPrice === undefined) { 
+      } else if (isTrackableAsset && asset.currentPrice === undefined) {
         priceUpdateText = 'Price not yet updated';
       }
       setClientFormattedLastPriceUpdate(priceUpdateText);
@@ -405,7 +410,7 @@ export default function AssetsPage() {
       const totalPurchaseCostForAsset = asset.purchasePrice * asset.quantity;
        if (totalPurchaseCostForAsset !== 0) {
          allTimeGainLossPercent = (allTimeGainLoss / totalPurchaseCostForAsset) * 100;
-       } else if (allTimeGainLoss !== 0) { 
+       } else if (allTimeGainLoss !== 0) {
          allTimeGainLossPercent = allTimeGainLoss > 0 ? Infinity : -Infinity;
        }
     }
@@ -518,11 +523,11 @@ export default function AssetsPage() {
     stock: { name: "Company Name", quantity: "Number of Shares", purchasePrice: "Purchase Price per Share", tickerSymbol: "Stock Ticker (e.g., AAPL)" },
     crypto: { name: "Cryptocurrency Name", quantity: "Quantity Owned", purchasePrice: "Purchase Price per Unit", tickerSymbol: "Crypto Symbol (e.g., BTCUSD)" },
     mutualfund: { name: "Fund Name", quantity: "Units Held", purchasePrice: "Purchase Price per Unit", tickerSymbol: "Fund Symbol (e.g., VOO)" },
-    bank: { name: "Account Nickname", quantity: "N/A", purchasePrice: "N/A", tickerSymbol: "N/A" }, 
+    bank: { name: "Account Nickname", quantity: "N/A", purchasePrice: "N/A", tickerSymbol: "N/A" },
     property: { name: "Property Name", quantity: "N/A", purchasePrice: "N/A", tickerSymbol: "N/A" },
   };
 
-  const currentAssetLabels = assetLabelMap[currentAsset?.category || 'stock'];
+  const currentAssetLabels = assetLabelMap[currentAssetForForm?.category || 'stock'];
 
 
   return (
@@ -537,7 +542,7 @@ export default function AssetsPage() {
         <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
             setIsFormOpen(isOpen);
             if (!isOpen) {
-                setCurrentAsset(initialAssetFormState);
+                setCurrentAssetForForm(initialAssetFormState);
             }
         }}>
         <DialogTrigger asChild>
@@ -547,7 +552,7 @@ export default function AssetsPage() {
         </DialogTrigger>
         <DialogContent className="sm:max-w-[480px]">
             <DialogHeader>
-            <DialogTitle>{currentAsset?.id ? 'Edit Asset' : `Add New ${activeTab && activeTab !== 'overview' ? categoryDisplayNames[activeTab as AssetCategory].slice(0,-1) : 'Asset'}`}</DialogTitle>
+            <DialogTitle>{currentAssetForForm?.id ? 'Edit Asset' : `Add New ${activeTab && activeTab !== 'overview' ? categoryDisplayNames[activeTab as AssetCategory].slice(0,-1) : 'Asset'}`}</DialogTitle>
             <DialogDescription>
                 Enter the details for your asset. Click "Save Asset" when done.
                 <span className="block text-xs mt-1 text-muted-foreground">Global currency settings and auto-conversion are planned for a future update.</span>
@@ -559,13 +564,13 @@ export default function AssetsPage() {
                  <div className="col-span-3">
                     <Input
                         id="name"
-                        value={currentAsset?.name || ''}
-                        onChange={(e) => setCurrentAsset(prev => ({ ...prev, name: e.target.value }))}
+                        value={currentAssetForForm?.name || ''}
+                        onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, name: e.target.value }))}
                         placeholder={
-                            currentAsset?.category === 'stock' ? 'e.g., Apple Inc.' :
-                            currentAsset?.category === 'crypto' ? 'e.g., Bitcoin' :
-                            currentAsset?.category === 'mutualfund' ? 'e.g., Vanguard S&P 500 ETF' :
-                            currentAsset?.category === 'bank' ? 'e.g., Main Savings Account' :
+                            currentAssetForForm?.category === 'stock' ? 'e.g., Apple Inc.' :
+                            currentAssetForForm?.category === 'crypto' ? 'e.g., Bitcoin' :
+                            currentAssetForForm?.category === 'mutualfund' ? 'e.g., Vanguard S&P 500 ETF' :
+                            currentAssetForForm?.category === 'bank' ? 'e.g., Main Savings Account' :
                             'e.g., Downtown Condo'
                         }
                      />
@@ -574,31 +579,29 @@ export default function AssetsPage() {
 
             {isCurrentAssetTrackable && (
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="tickerSymbol" className="text-right">{currentAssetLabels.tickerSymbol}</Label>
+                     <Label htmlFor="tickerSymbol" className="text-right">{currentAssetLabels.tickerSymbol}</Label>
                     <Input
                         id="tickerSymbol"
-                        value={currentAsset?.tickerSymbol || ''}
-                        onChange={(e) => setCurrentAsset(prev => ({ ...prev, tickerSymbol: e.target.value.toUpperCase() }))}
+                        value={currentAssetForForm?.tickerSymbol || ''}
+                        onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, tickerSymbol: e.target.value.toUpperCase() }))}
                         className="col-span-3"
                         placeholder={
-                            currentAsset?.category === 'stock' ? 'e.g., AAPL' :
-                            currentAsset?.category === 'crypto' ? 'e.g., BTCUSD' :
-                            currentAsset?.category === 'mutualfund' ? 'e.g., VOO' :
+                            currentAssetForForm?.category === 'stock' ? 'e.g., AAPL' :
+                            currentAssetForForm?.category === 'crypto' ? 'e.g., BTCUSD or ADAETH' :
+                            currentAssetForForm?.category === 'mutualfund' ? 'e.g., VOO or INDEX_FUND_CODE' :
                             ''
                         }
                     />
-                     <div className="col-span-4 text-xs text-muted-foreground text-center px-4">
+                    <div className="col-span-4 text-xs text-muted-foreground text-center px-4">
                         <Search className="inline h-3 w-3 mr-1" />
-                        For Stocks, Crypto, Mutual Funds: Enter the correct ticker symbol.
-                        Ex: AAPL for Apple, MSFT for Microsoft. For crypto, use symbol then currency (e.g., BTCUSD, ETHUSD).
-                        Check financial sites for correct symbols.
+                        Enter the correct ticker/symbol. AlphaVantage for US stocks (e.g., AAPL). For crypto, use SYMBOLCURRENCY (e.g., BTCUSD). For Indian mutual funds, use AMFI codes if supported by your data source. Search online for exact symbols if unsure.
                     </div>
                 </div>
             )}
 
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="category" className="text-right">Category</Label>
-                <Select value={currentAsset?.category || 'stock'} onValueChange={handleCategoryChangeInForm}>
+                <Select value={currentAssetForForm?.category || 'stock'} onValueChange={handleCategoryChangeInForm}>
                 <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select asset category" />
                 </SelectTrigger>
@@ -609,7 +612,7 @@ export default function AssetsPage() {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="currency" className="text-right">Currency</Label>
-                <Select value={currentAsset?.currency || 'USD'} onValueChange={(value) => setCurrentAsset({...currentAsset, currency: value })}>
+                <Select value={currentAssetForForm?.currency || 'USD'} onValueChange={(value) => setCurrentAssetForForm({...currentAssetForForm, currency: value })}>
                 <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
@@ -619,10 +622,10 @@ export default function AssetsPage() {
                 </Select>
             </div>
 
-            {(currentAsset?.category !== 'bank' && currentAsset?.category !== 'property') && (
+            {(currentAssetForForm?.category !== 'bank' && currentAssetForForm?.category !== 'property') && (
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="quantity" className="text-right">{currentAssetLabels.quantity}</Label>
-                    <Input id="quantity" type="number" value={currentAsset?.quantity === undefined ? '' : currentAsset.quantity} onChange={(e) => setCurrentAsset({...currentAsset, quantity: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder={currentAsset?.category === 'stock' ? 'e.g. 10' : currentAsset?.category === 'crypto' ? 'e.g. 0.5' : 'e.g. 100'}/>
+                    <Input id="quantity" type="number" value={currentAssetForForm?.quantity === undefined ? '' : currentAssetForForm.quantity} onChange={(e) => setCurrentAssetForForm({...currentAssetForForm, quantity: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder={currentAssetForForm?.category === 'stock' ? 'e.g. 10' : currentAssetForForm?.category === 'crypto' ? 'e.g. 0.5' : 'e.g. 100'}/>
                 </div>
             )}
 
@@ -630,21 +633,21 @@ export default function AssetsPage() {
                 <>
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="purchasePrice" className="text-right">{currentAssetLabels.purchasePrice}</Label>
-                    <Input id="purchasePrice" type="number" value={currentAsset?.purchasePrice === undefined ? '' : currentAsset.purchasePrice} onChange={(e) => setCurrentAsset({...currentAsset, purchasePrice: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder="Price per unit at purchase" />
+                    <Input id="purchasePrice" type="number" value={currentAssetForForm?.purchasePrice === undefined ? '' : currentAssetForForm.purchasePrice} onChange={(e) => setCurrentAssetForForm({...currentAssetForForm, purchasePrice: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder="Price per unit at purchase" />
                 </div>
                 </>
             )}
-            {!isCurrentAssetTrackable && (currentAsset?.category === 'bank' || currentAsset?.category === 'property') && (
+            {!isCurrentAssetTrackable && (currentAssetForForm?.category === 'bank' || currentAssetForForm?.category === 'property') && (
                 <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="currentValue" className="text-right">{currentAsset?.category === 'bank' ? 'Current Balance' : 'Current Estimated Value'}</Label>
-                <Input id="currentValue" type="number" value={currentAsset?.currentPrice === undefined ? '' : currentAsset.currentPrice} onChange={(e) => setCurrentAsset({...currentAsset, currentPrice: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder="Total current value" />
+                <Label htmlFor="currentValue" className="text-right">{currentAssetForForm?.category === 'bank' ? 'Current Balance' : 'Current Estimated Value'}</Label>
+                <Input id="currentValue" type="number" value={currentAssetForForm?.currentPrice === undefined ? '' : currentAssetForForm.currentPrice} onChange={(e) => setCurrentAssetForForm({...currentAssetForForm, currentPrice: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder="Total current value" />
                 </div>
             )}
             </div>
             <DialogFooter>
             <Button type="button" variant="outline" onClick={() => {
                 setIsFormOpen(false);
-                setCurrentAsset(initialAssetFormState);
+                setCurrentAssetForForm(initialAssetFormState);
             }}>Cancel</Button>
             <Button type="submit" onClick={handleSaveAsset}>Save Asset</Button>
             </DialogFooter>
@@ -806,5 +809,3 @@ export default function AssetsPage() {
     </div>
   );
 }
-
-    
