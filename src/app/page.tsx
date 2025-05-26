@@ -5,7 +5,7 @@ import React from 'react';
 import type { AssetCategory } from "@/contexts/AssetContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Bitcoin, Landmark, BarChartBig, WalletCards, TrendingUp, TrendingDown, DollarSign, PiggyBank, Building2 } from "lucide-react";
+import { Bitcoin, Landmark, BarChartBig, WalletCards, TrendingUp, DollarSign, PiggyBank, Building2, AlertTriangle } from "lucide-react"; // Removed TrendingDown
 import Link from "next/link";
 import Image from 'next/image';
 import { useAssets } from "@/contexts/AssetContext";
@@ -35,14 +35,12 @@ export default function HomePage() {
     return value.toLocaleString(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  // Calculate total net worth per currency
   const portfolioTotalsByCurrency: Record<string, number> = {};
   assets.forEach(asset => {
     const marketValue = getAssetMarketValue(asset);
     portfolioTotalsByCurrency[asset.currency] = (portfolioTotalsByCurrency[asset.currency] || 0) + marketValue;
   });
 
-  // Calculate summaries for each category per currency
   const categorySummariesByCurrency: Record<string, Record<AssetCategory, CategorySummary>> = {};
 
   assets.forEach(asset => {
@@ -69,7 +67,6 @@ export default function HomePage() {
     }
   });
 
-  // Calculate Gain/Loss Percent for categories
   Object.values(categorySummariesByCurrency).forEach(currencySummary => {
     (['crypto', 'stock', 'mutualfund'] as AssetCategory[]).forEach(cat => {
       const categoryData = currencySummary[cat];
@@ -78,7 +75,7 @@ export default function HomePage() {
       } else if (categoryData && categoryData.totalPurchaseCost === 0 && categoryData.gainLossAmount && categoryData.gainLossAmount !== 0) {
         categoryData.gainLossPercent = categoryData.gainLossAmount! > 0 ? Infinity : -Infinity; 
       } else {
-        categoryData.gainLossPercent = 0; // Default to 0 if no cost or no gain/loss
+        categoryData.gainLossPercent = 0;
       }
     });
   });
@@ -92,7 +89,7 @@ export default function HomePage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Your financial overview.
+            Your financial overview. All prices are manually entered.
           </p>
         </div>
          <Link href="/transactions" passHref>
@@ -115,6 +112,7 @@ export default function HomePage() {
                 <span className="text-sm text-muted-foreground ml-1">({currency})</span>
               </div>
             ))}
+            <p className="text-xs text-muted-foreground pt-1">Calculated from manually entered current asset values.</p>
           </CardContent>
         </Card>
       ) : (
@@ -160,7 +158,7 @@ export default function HomePage() {
                     <div className="text-2xl font-bold">{formatCurrency(summary.totalValue, currency)}</div>
                     {(category === 'stock' || category === 'crypto' || category === 'mutualfund') && summary.gainLossAmount !== undefined && summary.totalPurchaseCost !== undefined && (
                       <p className={`text-xs mt-1 ${summary.gainLossAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {summary.gainLossAmount >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1"/> : <TrendingDown className="inline h-4 w-4 mr-1"/>}
+                        {summary.gainLossAmount >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1"/> : <AlertTriangle className="inline h-4 w-4 mr-1"/>} {/* Changed to AlertTriangle for loss */}
                         {formatCurrency(summary.gainLossAmount, currency)}
                         {(summary.gainLossPercent !== undefined && summary.gainLossPercent !== Infinity && summary.gainLossPercent !== -Infinity && summary.totalPurchaseCost > 0) 
                           ? ` (${summary.gainLossPercent.toFixed(2)}%)`

@@ -24,7 +24,7 @@ export default function AiInsightsPage() {
     }
     return currentAssets
       .map(asset => {
-        const marketValue = getAssetMarketValue(asset);
+        const marketValue = getAssetMarketValue(asset); // Uses currentPrice which is now manual
         let detail = `${asset.name}: ${asset.currency} ${marketValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} (Category: ${asset.category}`;
         if (asset.tickerSymbol) detail += `, Ticker: ${asset.tickerSymbol}`;
         detail += ')';
@@ -78,7 +78,7 @@ export default function AiInsightsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">AI Financial Insights</h1>
         <p className="text-muted-foreground">
-          Get personalized optimization suggestions based on your currently tracked assets.
+          Get personalized optimization suggestions based on your manually tracked assets.
         </p>
       </div>
 
@@ -86,7 +86,7 @@ export default function AiInsightsPage() {
         <CardHeader>
           <CardTitle>Asset Analysis</CardTitle>
           <CardDescription>
-            Click the button below to analyze your assets (from the Assets page) and generate financial opportunities.
+            Click the button below to analyze your manually entered assets (from the Assets page) and generate financial opportunities.
             {(!assets || assets.length === 0) && (
                 <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
                     <Info className="h-5 w-5 text-primary" />
@@ -117,6 +117,7 @@ export default function AiInsightsPage() {
             <p>{error}</p>
           </CardContent>
         </Card>
+      </Card>
       )}
 
       {opportunities && opportunities.length > 0 && (
