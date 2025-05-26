@@ -24,14 +24,15 @@ export interface Asset {
   lastUpdated: string;
   lastPriceUpdate?: string;
   priceHistory?: AssetPriceData[];
+  priceFetchError?: string; // New field for fetch errors or status
 }
 
 interface AssetContextType {
   assets: Asset[];
-  addAsset: (newAssetData: Omit<Asset, 'id' | 'lastUpdated' | 'lastPriceUpdate' | 'priceHistory'>) => Asset; // Changed return type
+  addAsset: (newAssetData: Omit<Asset, 'id' | 'lastUpdated' | 'lastPriceUpdate' | 'priceHistory' | 'priceFetchError'>) => Asset;
   updateAsset: (updatedAsset: Partial<Omit<Asset, 'lastUpdated' | 'lastPriceUpdate'>> & { id: string }) => void;
   deleteAsset: (assetId: string) => void;
-  updateAssetPrice: (assetId: string, priceData: { currentPrice: number; previousClosePrice: number; priceHistory?: AssetPriceData[] }) => void;
+  updateAssetPrice: (assetId: string, priceData: { currentPrice: number; previousClosePrice: number; priceHistory?: AssetPriceData[]; priceFetchError?: string }) => void;
   getAssetMarketValue: (asset: Asset) => number;
 }
 
@@ -52,31 +53,36 @@ export const AssetProvider = ({ children }: { children: ReactNode }) => {
     {
       id: '1', name: 'Main Savings', category: 'bank', currency: 'USD', quantity: 1,
       currentPrice: 25000, lastUpdated: '2024-07-28', lastPriceUpdate: '2024-07-28',
-      priceHistory: [{date: '2024-07-01', price: 24900}, {date: '2024-07-28', price: 25000}]
+      priceHistory: [{date: '2024-07-01', price: 24900}, {date: '2024-07-28', price: 25000}],
+      priceFetchError: "Manual value"
     },
     {
       id: '2', name: 'Innovate Corp Shares', category: 'stock', currency: 'USD', tickerSymbol: 'INVC', quantity: 100, purchasePrice: 150,
       currentPrice: 165, previousClosePrice: 162, lastUpdated: '2024-07-28', lastPriceUpdate: '2024-07-29',
-      priceHistory: mockStockPriceHistory
+      priceHistory: mockStockPriceHistory,
+      priceFetchError: "Using mock data"
     },
     {
       id: '3', name: 'Digital Token X', category: 'crypto', currency: 'USD', tickerSymbol: 'DTX', quantity: 5000, purchasePrice: 0.50,
       currentPrice: 0.58, previousClosePrice: 0.55, lastUpdated: '2024-07-27', lastPriceUpdate: '2024-07-29',
-      priceHistory: mockCryptoPriceHistory
+      priceHistory: mockCryptoPriceHistory,
+      priceFetchError: "Using mock data"
     },
     {
       id: '4', name: 'Investment Property', category: 'property', currency: 'EUR', quantity: 1,
       currentPrice: 320000, lastUpdated: '2024-07-01', lastPriceUpdate: '2024-07-01',
-      priceHistory: [{date: '2024-01-01', price: 315000}, {date: '2024-07-01', price: 320000}]
+      priceHistory: [{date: '2024-01-01', price: 315000}, {date: '2024-07-01', price: 320000}],
+      priceFetchError: "Manual value"
     },
     {
       id: '5', name: 'Diversified Index Fund', category: 'mutualfund', currency: 'INR', tickerSymbol: 'DIF99', quantity: 200, purchasePrice: 6000,
       currentPrice: 6240, previousClosePrice: 6200, lastUpdated: '2024-07-25', lastPriceUpdate: '2024-07-29',
-      priceHistory: mockMutualFundPriceHistory.map(p => ({ ...p, price: p.price * 80 }))
+      priceHistory: mockMutualFundPriceHistory.map(p => ({ ...p, price: p.price * 80 })),
+      priceFetchError: "Using mock data"
     }
   ]);
 
-  const addAsset = useCallback((newAssetData: Omit<Asset, 'id' | 'lastUpdated' | 'lastPriceUpdate' | 'priceHistory'>): Asset => {
+  const addAsset = useCallback((newAssetData: Omit<Asset, 'id' | 'lastUpdated' | 'lastPriceUpdate' | 'priceHistory' | 'priceFetchError'>): Asset => {
     const isTrackable = newAssetData.category === 'stock' || newAssetData.category === 'crypto' || newAssetData.category === 'mutualfund';
 
     let historyForNewAsset: AssetPriceData[] = [];
@@ -98,22 +104,22 @@ export const AssetProvider = ({ children }: { children: ReactNode }) => {
         } else {
             historyForNewAsset.push({date: new Date().toISOString().split('T')[0], price: basePriceForHistory});
         }
-
     } else {
         historyForNewAsset = [{date: new Date().toISOString().split('T')[0], price: basePriceForHistory}];
     }
 
     const fullNewAsset: Asset = {
       ...newAssetData,
-      id: Date.now().toString() + Math.random().toString(36).substring(2, 9), // More unique ID
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
       lastUpdated: new Date().toISOString().split('T')[0],
       currentPrice: isTrackable ? newAssetData.purchasePrice : newAssetData.currentPrice,
       previousClosePrice: isTrackable ? newAssetData.purchasePrice : undefined,
       lastPriceUpdate: (newAssetData.currentPrice !== undefined || newAssetData.purchasePrice !== undefined) ? new Date().toISOString().split('T')[0] : undefined,
       priceHistory: historyForNewAsset,
+      priceFetchError: isTrackable ? "Using mock data (initial)" : "Manual value",
     };
     setAssets((prevAssets) => [...prevAssets, fullNewAsset]);
-    return fullNewAsset; // Return the newly created asset
+    return fullNewAsset;
   }, []);
 
   const updateAsset = useCallback((updatedAssetData: Partial<Omit<Asset, 'lastUpdated' | 'lastPriceUpdate'>> & { id: string }) => {
@@ -127,6 +133,7 @@ export const AssetProvider = ({ children }: { children: ReactNode }) => {
               lastPriceUpdate: (updatedAssetData.currentPrice !== undefined && updatedAssetData.currentPrice !== a.currentPrice && (a.category === 'bank' || a.category === 'property'))
                                ? new Date().toISOString().split('T')[0]
                                : a.lastPriceUpdate,
+              // priceFetchError is updated via updateAssetPrice
             }
           : a
       )
@@ -137,7 +144,7 @@ export const AssetProvider = ({ children }: { children: ReactNode }) => {
     setAssets((prevAssets) => prevAssets.filter((a) => a.id !== assetId));
   }, []);
 
-  const updateAssetPrice = useCallback((assetId: string, priceData: { currentPrice: number; previousClosePrice: number; priceHistory?: AssetPriceData[] }) => {
+  const updateAssetPrice = useCallback((assetId: string, priceData: { currentPrice: number; previousClosePrice: number; priceHistory?: AssetPriceData[], priceFetchError?: string }) => {
     setAssets((prevAssets) =>
       prevAssets.map((asset) =>
         asset.id === assetId
@@ -146,7 +153,8 @@ export const AssetProvider = ({ children }: { children: ReactNode }) => {
               currentPrice: priceData.currentPrice,
               previousClosePrice: priceData.previousClosePrice,
               lastPriceUpdate: new Date().toISOString().split('T')[0],
-              priceHistory: priceData.priceHistory || asset.priceHistory
+              priceHistory: priceData.priceHistory || asset.priceHistory,
+              priceFetchError: priceData.priceFetchError,
             }
           : asset
       )

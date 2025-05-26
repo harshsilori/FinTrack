@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, ExternalLink } from 'lucide-react';
+import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, ExternalLink, AlertTriangle } from 'lucide-react';
 import Image from 'next/image';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
@@ -99,7 +99,7 @@ export default function AssetsPage() {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return []; // No assets displayed directly under 'overview' tab for individual cards
+    return []; 
   }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
@@ -118,7 +118,7 @@ export default function AssetsPage() {
         currency: 'USD',
         quantity: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? 1 : 1,
         purchasePrice: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? undefined : 0,
-        currentPrice: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? 0 : undefined, // Set initial value if bank/property
+        currentPrice: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? 0 : undefined, 
         tickerSymbol: (prefilledCategory === 'bank' || prefilledCategory === 'property') ? undefined : '',
       });
     }
@@ -128,21 +128,46 @@ export default function AssetsPage() {
   const handleRefreshPrice = useCallback(async (asset: ContextAsset) => {
     if (asset.category === 'bank' || asset.category === 'property') {
       toast({ title: "Manual Update", description: `${asset.name} value is updated manually or via statements.`, variant: "default" });
+      updateAssetPrice(asset.id, {
+        currentPrice: asset.currentPrice || 0,
+        previousClosePrice: asset.previousClosePrice || asset.currentPrice || 0,
+        priceHistory: asset.priceHistory || [{ date: new Date().toISOString().split('T')[0], price: asset.currentPrice || 0 }],
+        priceFetchError: "Manual value."
+      });
       return;
     }
     if (!asset.tickerSymbol && (asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund')) {
-        toast({title: "Ticker Missing", description: `Please set a ticker for ${asset.name} to refresh its price.`, variant: "destructive"});
+        const missingTickerError = `Ticker missing for ${asset.name}. Cannot refresh price.`;
+        toast({title: "Ticker Missing", description: missingTickerError, variant: "destructive"});
+        updateAssetPrice(asset.id, { 
+            currentPrice: asset.currentPrice || 0, 
+            previousClosePrice: asset.previousClosePrice || asset.currentPrice || 0, 
+            priceHistory: asset.priceHistory,
+            priceFetchError: missingTickerError
+        });
         return;
     }
 
     setIsFetchingPrice(prev => ({ ...prev, [asset.id]: true }));
+    let priceData;
     try {
-      const priceData = await fetchAssetPrice(asset.category, asset.tickerSymbol, asset.currency);
+      priceData = await fetchAssetPrice(asset.category, asset.tickerSymbol, asset.currency);
       updateAssetPrice(asset.id, priceData);
-      toast({ title: "Price Updated", description: `Price for ${asset.name} refreshed.` });
+      if (!priceData.priceFetchError) {
+        toast({ title: "Price Updated", description: `Price for ${asset.name} refreshed.` });
+      } else {
+        toast({ title: "Info", description: `Price for ${asset.name}: ${priceData.priceFetchError}`, variant: "default" });
+      }
     } catch (error) {
       console.error("Failed to fetch price:", error);
-      toast({ title: "Fetch Error", description: `Could not refresh price for ${asset.name}.`, variant: "destructive" });
+      const fetchErrorMsg = `Could not refresh price for ${asset.name}. Network or service error.`;
+      toast({ title: "Fetch Error", description: fetchErrorMsg, variant: "destructive" });
+      updateAssetPrice(asset.id, {
+        currentPrice: asset.currentPrice || 0,
+        previousClosePrice: asset.previousClosePrice || asset.currentPrice || 0,
+        priceHistory: asset.priceHistory,
+        priceFetchError: fetchErrorMsg
+      });
     } finally {
       setIsFetchingPrice(prev => ({ ...prev, [asset.id]: false }));
     }
@@ -166,7 +191,7 @@ export default function AssetsPage() {
       if (assetsInTabToRefresh.length > 0) {
         for (const asset of assetsInTabToRefresh) {
           await handleRefreshPrice(asset);
-          await new Promise(resolve => setTimeout(resolve, 500)); // Stagger API calls
+          await new Promise(resolve => setTimeout(resolve, 500)); 
         }
       }
       setInitialRefreshPerformedForTab(prev => ({ ...prev, [activeTab]: true }));
@@ -175,7 +200,8 @@ export default function AssetsPage() {
     if (allAssets.length > 0 && activeTab !== 'overview') {
       performTabRefresh();
     }
-  }, [activeTab, allAssets, handleRefreshPrice, initialRefreshPerformedForTab]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, allAssets, initialRefreshPerformedForTab]); // handleRefreshPrice removed to prevent loop
 
 
   const handleSaveAsset = () => {
@@ -204,7 +230,7 @@ export default function AssetsPage() {
             toast({ title: "Error", description: "Purchase price must be zero or positive for trackable assets.", variant: "destructive" });
             return;
         }
-    } else { // Bank or Property
+    } else { 
         if (currentAsset.currentPrice === undefined || currentAsset.currentPrice < 0) {
             toast({ title: "Error", description: "Current value must be zero or positive for bank accounts and property.", variant: "destructive" });
             return;
@@ -230,7 +256,7 @@ export default function AssetsPage() {
       updateAsset(payloadForUpdate);
       toast({ title: "Asset Updated", description: `${payloadForUpdate.name} has been updated.` });
     } else {
-      const newAssetPayload: Omit<ContextAsset, 'id' | 'lastUpdated' | 'lastPriceUpdate' | 'priceHistory'> = {
+      const newAssetPayload: Omit<ContextAsset, 'id' | 'lastUpdated' | 'lastPriceUpdate' | 'priceHistory' | 'priceFetchError'> = {
         name: currentAsset.name!,
         category: currentAsset.category!,
         currency: currentAsset.currency!,
@@ -439,6 +465,12 @@ export default function AssetsPage() {
               : (asset.lastUpdated ? "Loading save date..." : "")
             }
           </p>
+          {asset.priceFetchError && (
+            <p className="text-xs text-destructive mt-1">
+              <AlertTriangle className="inline h-3 w-3 mr-1" />
+              {asset.priceFetchError}
+            </p>
+          )}
         </CardContent>
         <CardFooter className="flex justify-between items-center gap-2">
             {isTrackableAsset && (
@@ -718,4 +750,3 @@ export default function AssetsPage() {
     </div>
   );
 }
-
