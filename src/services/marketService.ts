@@ -17,7 +17,7 @@ const mockPriceHistoryPatterns: Record<string, AssetPriceData[]> = {
   tech: [
     { date: '2024-07-01', price: 200 }, { date: '2024-07-08', price: 205 }, { date: '2024-07-15', price: 210 }, { date: '2024-07-22', price: 208 }, { date: '2024-07-29', price: 215 },
   ],
-  cryptoGeneral: [
+  cryptoGeneral: [ // For altcoins other than BTC/ETH/ADA
     { date: '2024-07-01', price: 0.80 }, { date: '2024-07-08', price: 0.85 }, { date: '2024-07-15', price: 0.78 }, { date: '2024-07-22', price: 0.90 }, { date: '2024-07-29', price: 0.95 },
   ],
   cryptoMajorBTC: [
@@ -35,12 +35,12 @@ const mockPriceHistoryPatterns: Record<string, AssetPriceData[]> = {
 };
 
 function getDeterministicFactor(str: string | undefined): number {
-  if (!str || str.length === 0) return 0.5;
+  if (!str || str.length === 0) return 0.5; // Default factor if no string
   let sum = 0;
-  for (let i = 0; i < Math.min(str.length, 10); i++) {
+  for (let i = 0; i < Math.min(str.length, 10); i++) { // Use up to 10 chars
     sum += str.charCodeAt(i);
   }
-  return ((sum * 13) % 101) / 100; 
+  return ((sum * 13) % 101) / 100; // Generate a factor between 0 and 1
 }
 
 
@@ -67,46 +67,53 @@ export async function fetchAssetPrice(
             const data = await response.json();
 
             if (data['Global Quote'] && data['Global Quote']['05. price'] && data['Global Quote']['08. previous close']) {
-              const currentPrice = parseFloat(data['Global Quote']['05. price']);
-              const previousClosePrice = parseFloat(data['Global Quote']['08. previous close']);
-
-              console.log(`Successfully fetched and parsed from Alpha Vantage for ${tickerSymbol}: Current Price USD ${currentPrice}, Previous Close USD ${previousClosePrice}`);
-
-              // Use a default history pattern and scale it. Actual history fetching would be a separate API call.
-              const historyPattern = mockPriceHistoryPatterns.default; 
-              const lastPatternPoint = historyPattern.length > 0 ? historyPattern[historyPattern.length - 1].price : currentPrice;
-              const scaleFactor = lastPatternPoint !== 0 ? currentPrice / lastPatternPoint : 1;
+              const currentPriceStr = data['Global Quote']['05. price'];
+              const previousCloseStr = data['Global Quote']['08. previous close'];
               
-              const priceHistory = historyPattern.map(p => ({
-                ...p,
-                price: parseFloat((p.price * scaleFactor).toFixed(2))
-              }));
-              if (priceHistory.length > 0) {
-                priceHistory[priceHistory.length - 1].price = currentPrice; // Ensure last history point matches current fetched price
+              const currentPrice = parseFloat(currentPriceStr);
+              const previousClosePrice = parseFloat(previousCloseStr);
+
+              console.log(`Alpha Vantage Raw Prices for ${tickerSymbol}: Current='${currentPriceStr}', PreviousClose='${previousCloseStr}'`);
+              console.log(`Alpha Vantage Parsed Floats for ${tickerSymbol}: Current=${currentPrice}, PreviousClose=${previousClosePrice}`);
+
+              if (isNaN(currentPrice) || currentPrice === 0 || isNaN(previousClosePrice)) {
+                console.warn(`Alpha Vantage returned non-numeric, zero, or invalid previous close price for ${tickerSymbol}. Parsed: current=${currentPrice}, prevClose=${previousClosePrice}. Raw: current='${currentPriceStr}', prevClose='${previousCloseStr}'. Falling back to mock.`);
+                // Fall through to mock data by not returning here, allowing mock data generation below
+              } else {
+                console.log(`Successfully fetched and parsed from Alpha Vantage for ${tickerSymbol}: Current Price USD ${currentPrice}, Previous Close USD ${previousClosePrice}`);
+
+                const historyPattern = mockPriceHistoryPatterns.default;
+                const lastPatternPoint = historyPattern.length > 0 ? historyPattern[historyPattern.length - 1].price : currentPrice;
+                const scaleFactor = lastPatternPoint !== 0 ? currentPrice / lastPatternPoint : 1;
+                
+                const priceHistory = historyPattern.map(p => ({
+                  ...p,
+                  price: parseFloat((p.price * scaleFactor).toFixed(2))
+                }));
+                if (priceHistory.length > 0) {
+                  priceHistory[priceHistory.length - 1].price = currentPrice;
+                }
+
+                if (currency !== 'USD') {
+                  console.warn(`Alpha Vantage provides USD prices. Currency conversion to ${currency} is not yet implemented for real data. Displaying as USD value with ${currency} symbol.`);
+                }
+
+                return {
+                  currentPrice: parseFloat(currentPrice.toFixed(2)),
+                  previousClosePrice: parseFloat(previousClosePrice.toFixed(2)),
+                  priceHistory: priceHistory,
+                };
               }
-
-               if (currency !== 'USD') {
-                 console.warn(`Alpha Vantage provides USD prices. Currency conversion to ${currency} is not yet implemented for real data. Displaying as USD value with ${currency} symbol.`);
-               }
-
-              return {
-                currentPrice: parseFloat(currentPrice.toFixed(2)),
-                previousClosePrice: parseFloat(previousClosePrice.toFixed(2)),
-                priceHistory: priceHistory,
-              };
             } else if (data['Note']) {
                console.warn(`Alpha Vantage API call limit likely reached for ${tickerSymbol}: ${data['Note']}`);
                console.warn("Raw Alpha Vantage response (Note):", JSON.stringify(data, null, 2));
-               // Fall through to mock data
             } else {
               console.warn(`Price data not found for ${tickerSymbol} in Alpha Vantage response. This could be an invalid ticker or other API issue.`);
               console.warn("Raw Alpha Vantage response (Data not found):", JSON.stringify(data, null, 2));
-              // Fall through to mock data
             }
         }
       } catch (error) {
         console.error(`Error fetching or parsing from Alpha Vantage for ${tickerSymbol}:`, error);
-        // Fall through to mock data
       }
     } else {
       console.log("Alpha Vantage API key not found in .env.local. Falling back to mock stock data.");
@@ -121,14 +128,14 @@ export async function fetchAssetPrice(
 
   let baseTargetPriceInCurrency: number;
   let historyPatternKey = 'default';
-  const deterministicFactor = getDeterministicFactor(tickerSymbol);
+  const deterministicFactor = getDeterministicFactor(tickerSymbol); // Ensures same ticker gets similar base price
 
   switch (category) {
     case 'stock':
       historyPatternKey = tickerSymbol?.toLowerCase().includes('tech') || tickerSymbol?.toLowerCase().includes('google') || tickerSymbol?.toLowerCase().includes('apple') ? 'tech' : 'default';
       if (currency === 'INR') baseTargetPriceInCurrency = (1000 + deterministicFactor * (15000 - 1000)); // e.g. 1000 to 15000 INR
       else if (currency === 'EUR') baseTargetPriceInCurrency = (10 + deterministicFactor * (500 - 10)); // e.g. 10 to 500 EUR
-      else baseTargetPriceInCurrency = (10 + deterministicFactor * (500 - 10)); // USD or other
+      else baseTargetPriceInCurrency = (10 + deterministicFactor * (500 - 10)); // USD or other: $10 to $500
       break;
     case 'crypto':
       const upperTicker = tickerSymbol?.toUpperCase();
@@ -142,13 +149,13 @@ export async function fetchAssetPrice(
         if (currency === 'INR') baseTargetPriceInCurrency = (240000 + deterministicFactor * (60000)); // 240k to 300k INR
         else if (currency === 'EUR') baseTargetPriceInCurrency = (2800 + deterministicFactor * (700)); // 2.8k to 3.5k EUR
         else baseTargetPriceInCurrency = (3000 + deterministicFactor * (500)); // 3k to 3.5k USD
-      } else if (upperTicker === 'ADA' || upperTicker === 'ADAUSD') {
+      } else if (upperTicker === 'ADA' || upperTicker === 'ADAUSD') { // Cardano Specific
         historyPatternKey = 'cryptoADA';
-        if (currency === 'INR') baseTargetPriceInCurrency = (50 + deterministicFactor * (30)); // 50 to 80 INR
-        else if (currency === 'EUR') baseTargetPriceInCurrency = (0.5 + deterministicFactor * (0.3)); // 0.5 to 0.8 EUR
-        else baseTargetPriceInCurrency = (0.6 + deterministicFactor * (0.4)); // 0.6 to 1.0 USD
+        if (currency === 'INR') baseTargetPriceInCurrency = (50 + deterministicFactor * (30));       // 50 to 80 INR
+        else if (currency === 'EUR') baseTargetPriceInCurrency = (0.5 + deterministicFactor * (0.3));  // 0.5 to 0.8 EUR
+        else baseTargetPriceInCurrency = (0.6 + deterministicFactor * (0.4));   // 0.6 to 1.0 USD
       } else { 
-        historyPatternKey = 'cryptoGeneral';
+        historyPatternKey = 'cryptoGeneral'; // General Altcoins
         if (currency === 'INR') baseTargetPriceInCurrency = (15 + deterministicFactor * (185 - 15)); // 15 to 200 INR
         else if (currency === 'EUR') baseTargetPriceInCurrency = (0.15 + deterministicFactor * (2.5 - 0.15)); // 0.15 to 2.5 EUR
         else baseTargetPriceInCurrency = (0.2 + deterministicFactor * (3 - 0.2)); // 0.2 to 3 USD
@@ -162,31 +169,38 @@ export async function fetchAssetPrice(
       break;
     case 'bank':
     case 'property':
+      // For bank/property, value is usually manually entered or from statements, not "fetched" like market prices
       const stableValue = (currency === 'INR' ? 100000 : currency === 'EUR' ? 10000 : 12000) * (1 + deterministicFactor * 0.1);
       return {
         currentPrice: parseFloat(stableValue.toFixed(2)),
-        previousClosePrice: parseFloat((stableValue * 0.998).toFixed(2)),
+        previousClosePrice: parseFloat((stableValue * 0.998).toFixed(2)), // Slight variation for previous close
         priceHistory: [{date: new Date().toISOString().split('T')[0], price: parseFloat(stableValue.toFixed(2))}]
       };
-    default:
+    default: // Should not happen if categories are well-defined
       baseTargetPriceInCurrency = (currency === 'INR' ? 1000 : currency === 'EUR' ? 10 : 10);
   }
 
-  const currentPriceInTargetCurrency = baseTargetPriceInCurrency * (1 + (Math.random() - 0.48) * 0.04); // Fluctuate by +/- 2% from stable base
-  const previousClosePriceInTargetCurrency = currentPriceInTargetCurrency * (1 + (Math.random() - 0.48) * 0.03); // Fluctuate by +/- 1.5% from current
+  // Apply a small random fluctuation to the base target price
+  const currentPriceInTargetCurrency = baseTargetPriceInCurrency * (1 + (Math.random() - 0.5) * 0.04); // Fluctuate by +/- 2%
+  const previousClosePriceInTargetCurrency = currentPriceInTargetCurrency * (1 + (Math.random() - 0.5) * 0.03); // Fluctuate by +/- 1.5% from current
 
   let baseHistoryPattern = mockPriceHistoryPatterns[historyPatternKey] || mockPriceHistoryPatterns.default;
   const lastPatternPointValue = baseHistoryPattern.length > 0 ? baseHistoryPattern[baseHistoryPattern.length - 1].price : currentPriceInTargetCurrency;
-  const scaleFactor = lastPatternPointValue !== 0 ? currentPriceInTargetCurrency / lastPatternPointValue : 1;
+  
+  // Ensure lastPatternPointValue is not zero to prevent division by zero if history starts at 0
+  const safeLastPatternPointValue = lastPatternPointValue === 0 ? 1 : lastPatternPointValue;
+  const scaleFactor = currentPriceInTargetCurrency / safeLastPatternPointValue;
 
   const finalPriceHistory = baseHistoryPattern.map(p => ({
     ...p,
     price: parseFloat((p.price * scaleFactor).toFixed(2))
   }));
   
+  // Ensure the last point in the history matches the current price
   if (finalPriceHistory.length > 0) {
       finalPriceHistory[finalPriceHistory.length - 1].price = parseFloat(currentPriceInTargetCurrency.toFixed(2));
   } else {
+      // If history is empty for some reason, add at least the current price point
       finalPriceHistory.push({ date: new Date().toISOString().split('T')[0], price: parseFloat(currentPriceInTargetCurrency.toFixed(2))});
   }
 
@@ -196,3 +210,5 @@ export async function fetchAssetPrice(
     priceHistory: finalPriceHistory,
   };
 }
+
+
