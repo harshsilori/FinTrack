@@ -104,7 +104,7 @@ export default function AssetsPage() {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return [];
+    return []; // No assets displayed directly in "Overview" tab, only the summary
   }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
@@ -133,7 +133,7 @@ export default function AssetsPage() {
     setIsFormOpen(true);
   };
 
- const handleRefreshPrice = useCallback(async (asset: ContextAsset) => {
+  const handleRefreshPrice = useCallback(async (asset: ContextAsset) => {
     if (asset.category === 'bank' || asset.category === 'property') {
       toast({ title: "Manual Update", description: `${asset.name} value is updated manually or via statements.`, variant: "default" });
       updateAssetPrice(asset.id, {
@@ -162,9 +162,14 @@ export default function AssetsPage() {
     try {
       priceData = await fetchAssetPrice(asset.category, asset.tickerSymbol, asset.currency);
       updateAssetPrice(asset.id, priceData);
-      if (!priceData.priceFetchError) {
-        toast({ title: "Price Updated", description: `Price for ${asset.name} refreshed.` });
-      } else {
+      // Only toast if there's no significant error from the fetch itself
+      // Minor notes like "Using mock data" are fine to show without a toast here, they appear on card
+      if (!priceData.priceFetchError?.toLowerCase().includes("error") && !priceData.priceFetchError?.toLowerCase().includes("failed")) {
+        // Avoid toast for "Using mock data" or "Manual value" during auto-refresh
+        if (!(priceData.priceFetchError?.includes("mock data") || priceData.priceFetchError?.includes("Manual value"))) {
+             toast({ title: "Price Updated", description: `Price for ${asset.name} refreshed.` });
+        }
+      } else if (priceData.priceFetchError) {
         toast({ title: "Info", description: `Price for ${asset.name}: ${priceData.priceFetchError}`, variant: "default" });
       }
     } catch (error) {
@@ -183,7 +188,7 @@ export default function AssetsPage() {
     } finally {
       setIsFetchingPrice(prev => ({ ...prev, [asset.id]: false }));
     }
-  }, [toast, updateAssetPrice]);
+  }, [toast, updateAssetPrice]); // updateAssetPrice is from context, toast from hook, both stable
 
 
   useEffect(() => {
@@ -201,9 +206,9 @@ export default function AssetsPage() {
 
         if (assetsInTabToRefresh.length > 0) {
             for (const asset of assetsInTabToRefresh) {
-                if (!isFetchingPrice[asset.id]) {
+                if (!isFetchingPrice[asset.id]) { // Check if this specific asset is already fetching
                     await handleRefreshPrice(asset);
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Stagger API calls
                 }
             }
         }
@@ -213,7 +218,8 @@ export default function AssetsPage() {
     if (allAssets.length > 0 && activeTab !== 'overview') {
         performTabRefresh();
     }
-  }, [activeTab, allAssets, initialRefreshPerformedForTab, handleRefreshPrice, isFetchingPrice]); // Added isFetchingPrice to dependency array
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, allAssets, handleRefreshPrice, initialRefreshPerformedForTab]); // isFetchingPrice removed, handleRefreshPrice memoized
 
 
   const handleSaveAsset = () => {
@@ -232,6 +238,7 @@ export default function AssetsPage() {
     }
 
     const quantityToSave = (currentAsset.category === 'bank' || currentAsset.category === 'property') ? 1 : (Number(currentAsset.quantity) || 0);
+    // Use tickerSearchQuery as the source of truth for the ticker symbol when saving
     const finalTickerSymbol = isTrackableCategory ? tickerSearchQuery.toUpperCase() : undefined;
 
 
@@ -282,7 +289,7 @@ export default function AssetsPage() {
       } else {
         newAssetPayload.currentPrice = Number(currentAsset.currentPrice) || 0;
       }
-      addedAssetWithId = addAsset(newAssetPayload);
+      addedAssetWithId = addAsset(newAssetPayload); // addAsset now returns the asset
       toast({ title: "Asset Added", description: `${newAssetPayload.name} has been added.` });
     }
     setIsFormOpen(false);
@@ -291,7 +298,9 @@ export default function AssetsPage() {
     setTickerSuggestions([]);
 
     if (addedAssetWithId && isTrackableCategory && addedAssetWithId.tickerSymbol) {
+        // Trigger initial refresh for the new asset
         handleRefreshPrice(addedAssetWithId);
+        // Mark its tab as needing a fresh check if user navigates there
         if (addedAssetWithId.category) {
            setInitialRefreshPerformedForTab(prev => ({ ...prev, [addedAssetWithId!.category as string]: false }));
         }
@@ -349,21 +358,22 @@ export default function AssetsPage() {
 
     if (isNewCategoryTrackable) {
         newState.tickerSymbol = currentAsset?.tickerSymbol || '';
-        setTickerSearchQuery(currentAsset?.tickerSymbol || '');
+        setTickerSearchQuery(currentAsset?.tickerSymbol || ''); // Keep ticker search query consistent
         newState.purchasePrice = currentAsset?.purchasePrice === undefined ? 0 : currentAsset.purchasePrice;
-        newState.quantity = currentAsset?.quantity === undefined || currentAsset.quantity === 1 ? 1 : currentAsset.quantity;
+        newState.quantity = currentAsset?.quantity === undefined || currentAsset.quantity === 1 ? 1 : currentAsset.quantity; // Default quantity if undefined
+        // Remove currentPrice if switching from non-trackable to trackable
         if (currentAsset?.category === 'bank' || currentAsset?.category === 'property') {
           delete newState.currentPrice;
         }
-    } else {
+    } else { // Bank or Property
         newState.currentPrice = currentAsset?.currentPrice === undefined ? 0 : currentAsset.currentPrice;
-        newState.quantity = 1;
+        newState.quantity = 1; // Quantity is always 1 for bank/property
         delete newState.tickerSymbol;
-        setTickerSearchQuery('');
+        setTickerSearchQuery(''); // Clear ticker search query
         delete newState.purchasePrice;
     }
     setCurrentAsset(newState);
-    setTickerSuggestions([]);
+    setTickerSuggestions([]); // Clear suggestions when category changes
     setShowTickerSuggestionsPopover(false);
   };
 
@@ -404,7 +414,10 @@ export default function AssetsPage() {
   const handleTickerInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setTickerSearchQuery(query);
-    setCurrentAsset(prev => ({ ...prev, tickerSymbol: query.toUpperCase() }));
+    // Removed: setCurrentAsset(prev => ({ ...prev, tickerSymbol: query.toUpperCase() }));
+    // This direct update to currentAsset.tickerSymbol was likely causing input issues.
+    // tickerSearchQuery is now the source of truth for the input, and used on save.
+    // currentAsset.tickerSymbol is updated when a suggestion is clicked or on form initialization.
     if (query.trim().length > 0) {
       debouncedTickerSearch(query);
     } else {
@@ -416,10 +429,10 @@ export default function AssetsPage() {
   const handleSuggestionClick = (suggestion: TickerSuggestion) => {
     setCurrentAsset(prev => ({
       ...prev,
-      tickerSymbol: suggestion.symbol,
-      name: prev?.name || suggestion.name,
+      tickerSymbol: suggestion.symbol, // Set the ticker in currentAsset
+      name: prev?.name || suggestion.name, // Optionally prefill name
     }));
-    setTickerSearchQuery(suggestion.symbol);
+    setTickerSearchQuery(suggestion.symbol); // Update the input field display
     setTickerSuggestions([]);
     setShowTickerSuggestionsPopover(false);
   };
@@ -464,8 +477,8 @@ export default function AssetsPage() {
       const totalPurchaseCostForAsset = asset.purchasePrice * asset.quantity;
        if (totalPurchaseCostForAsset !== 0) {
          allTimeGainLossPercent = (allTimeGainLoss / totalPurchaseCostForAsset) * 100;
-       } else if (allTimeGainLoss !== 0) {
-         allTimeGainLossPercent = allTimeGainLoss > 0 ? Infinity : -Infinity;
+       } else if (allTimeGainLoss !== 0) { // Gain exists but purchase cost was 0
+         allTimeGainLossPercent = allTimeGainLoss > 0 ? Infinity : -Infinity; // Or handle as N/A
        }
     }
 
@@ -658,7 +671,9 @@ export default function AssetsPage() {
                     <Label htmlFor="tickerSymbol" className="text-right">{currentAssetLabels.ticker}</Label>
                     <div className="col-span-3">
                     <Popover open={showTickerSuggestionsPopover && tickerSearchQuery.length > 0} onOpenChange={(isOpen) => {
+                        // Prevent closing when clicking on the input itself or suggestions
                         if (!isOpen) {
+                           // Delay hiding to allow click on suggestions
                            setTimeout(() => setShowTickerSuggestionsPopover(false), 100);
                         }
                     }}>
@@ -756,7 +771,7 @@ export default function AssetsPage() {
                     {Object.entries(portfolioTotalsByCurrency).map(([currency, totalData]) => {
                         const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
                             ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100
-                            : (totalData.allTimeGain !== 0 ? Infinity : 0);
+                            : (totalData.allTimeGain !== 0 ? Infinity : 0); // Avoid NaN if totalPurchaseCost is 0 but gain exists
                         return (
                             <div key={currency} className="mb-3">
                             <p className="text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
@@ -819,9 +834,10 @@ export default function AssetsPage() {
                             : (totalData.allTimeGain !== 0 ? Infinity : 0);
                         const isTrackableCategoryForTab = category === 'stock' || category === 'crypto' || category === 'mutualfund';
 
+                        // Ensure we only render if there are assets for this currency in this category OR if there's a market value
                         const assetsInThisCurrencyAndCategory = allAssets.filter(a => a.category === category && a.currency === currency);
                         if (assetsInThisCurrencyAndCategory.length === 0 && totalData.marketValue === 0) {
-                            return null;
+                            return null; // Don't render empty currency sections if no assets for it in this category
                         }
 
                         return (
@@ -890,3 +906,4 @@ export default function AssetsPage() {
     </div>
   );
 }
+
