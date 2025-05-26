@@ -72,11 +72,11 @@ export default function AssetsPage() {
   const [isFetchingPrice, setIsFetchingPrice] = useState<Record<string, boolean>>({});
   const [initialRefreshPerformedForTab, setInitialRefreshPerformedForTab] = useState<Record<string, boolean>>({});
 
-  const [tickerSearchQuery, setTickerSearchQuery] = useState('');
-  const [tickerSuggestions, setTickerSuggestions] = useState<TickerSuggestion[]>([]);
-  const [isTickerSearching, setIsTickerSearching] = useState(false);
-  const [showTickerSuggestionsPopover, setShowTickerSuggestionsPopover] = useState(false);
-
+  // State for company name search and suggestions
+  const [companyNameSearchQuery, setCompanyNameSearchQuery] = useState('');
+  const [companyNameSuggestions, setCompanyNameSuggestions] = useState<TickerSuggestion[]>([]);
+  const [isCompanyNameSearching, setIsCompanyNameSearching] = useState(false);
+  const [showCompanyNameSuggestionsPopover, setShowCompanyNameSuggestionsPopover] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -99,7 +99,6 @@ export default function AssetsPage() {
       params.set('category', newTabValue);
     }
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
-     // Reset initial refresh flags when tab changes to ensure refresh on next visit
     if (newTabValue !== 'overview') {
       setInitialRefreshPerformedForTab(prev => ({ ...prev, [newTabValue]: false }));
     }
@@ -109,7 +108,7 @@ export default function AssetsPage() {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return []; // For overview tab, individual assets are not listed directly under it.
+    return [];
   }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
@@ -120,13 +119,13 @@ export default function AssetsPage() {
   const openForm = (asset?: ContextAsset) => {
     if (asset) {
       setCurrentAsset({ ...asset });
-      setTickerSearchQuery(asset.tickerSymbol || '');
+      setCompanyNameSearchQuery(asset.name || ''); // Initialize company name search with asset name
     } else {
       const prefilledCategory = (activeTab && activeTab !== 'overview') ? activeTab : 'stock';
       const newInitialState: Partial<ContextAsset> = {
         ...initialAssetFormState,
         category: prefilledCategory as AssetCategory,
-        currency: 'USD', // Default currency
+        currency: 'USD',
       };
       if (prefilledCategory === 'bank' || prefilledCategory === 'property') {
         newInitialState.quantity = 1;
@@ -138,10 +137,10 @@ export default function AssetsPage() {
         newInitialState.tickerSymbol = '';
       }
       setCurrentAsset(newInitialState);
-      setTickerSearchQuery(newInitialState.tickerSymbol || '');
+      setCompanyNameSearchQuery(newInitialState.name || '');
     }
-    setTickerSuggestions([]);
-    setShowTickerSuggestionsPopover(false);
+    setCompanyNameSuggestions([]);
+    setShowCompanyNameSuggestionsPopover(false);
     setIsFormOpen(true);
   };
 
@@ -163,7 +162,7 @@ export default function AssetsPage() {
     }
 
     if (!asset.tickerSymbol && (asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund')) {
-        const missingTickerError = `Ticker missing for ${asset.name}. Cannot refresh price.`;
+        const missingTickerError = `Ticker missing for ${asset.name}. Cannot refresh price. Please edit the asset and select a name that provides a ticker.`;
         toast({title: "Ticker Missing", description: missingTickerError, variant: "destructive"});
         updateAssetPrice(asset.id, {
             currentPrice: asset.currentPrice || 0,
@@ -181,10 +180,10 @@ export default function AssetsPage() {
       updateAssetPrice(asset.id!, priceData);
       if (!priceData.priceFetchError?.toLowerCase().includes("error") && !priceData.priceFetchError?.toLowerCase().includes("failed")) {
         if (!(priceData.priceFetchError?.includes("mock data") || priceData.priceFetchError?.includes("Manual value"))) {
-             toast({ title: "Price Updated", description: `Price for ${asset.name} refreshed.` });
+             // toast({ title: "Price Updated", description: `Price for ${asset.name} refreshed.` }); // Reduced toast frequency
         }
       } else if (priceData.priceFetchError) {
-        toast({ title: "Info", description: `Price for ${asset.name}: ${priceData.priceFetchError}`, variant: "default" });
+        // toast({ title: "Info", description: `Price for ${asset.name}: ${priceData.priceFetchError}`, variant: "default" }); // Reduced toast frequency
       }
     } catch (error) {
       let detailedError = "Could not refresh price due to an unknown error.";
@@ -221,9 +220,9 @@ export default function AssetsPage() {
         if (assetsInTabToRefresh.length > 0) {
             console.log(`Refreshing ${assetsInTabToRefresh.length} assets in tab ${activeTab}`);
             for (const asset of assetsInTabToRefresh) {
-                if (!isFetchingPrice[asset.id]) { // Check if already fetching
+                if (!isFetchingPrice[asset.id]) {
                     await handleRefreshPrice(asset);
-                    await new Promise(resolve => setTimeout(resolve, 500)); // Stagger API calls
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
         }
@@ -234,7 +233,7 @@ export default function AssetsPage() {
       performTabRefresh();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, allAssets, initialRefreshPerformedForTab]); // Removed handleRefreshPrice to break potential loops
+  }, [activeTab, allAssets, initialRefreshPerformedForTab, handleRefreshPrice]);
 
 
   const handleSaveAsset = () => {
@@ -251,21 +250,23 @@ export default function AssetsPage() {
             return;
         }
     }
+    
+    const finalName = companyNameSearchQuery || currentAsset.name; // Use search query if it exists
 
     const quantityToSave = (currentAsset.category === 'bank' || currentAsset.category === 'property') ? 1 : (Number(currentAsset.quantity) || 0);
-    const finalTickerSymbol = isTrackableCategory ? tickerSearchQuery.toUpperCase() : undefined;
+    const finalTickerSymbol = isTrackableCategory ? currentAsset.tickerSymbol : undefined;
 
 
     if (isTrackableCategory) {
         if (!finalTickerSymbol) {
-            toast({ title: "Error", description: "Ticker symbol is required for stocks, crypto, and mutual funds.", variant: "destructive" });
+            toast({ title: "Error", description: "Ticker symbol is required for stocks, crypto, and mutual funds. Please select an asset name from the suggestions.", variant: "destructive" });
             return;
         }
         if (currentAsset.purchasePrice === undefined || currentAsset.purchasePrice < 0) {
             toast({ title: "Error", description: "Purchase price must be zero or positive for trackable assets.", variant: "destructive" });
             return;
         }
-    } else { // Bank or Property
+    } else {
         if (currentAsset.currentPrice === undefined || currentAsset.currentPrice < 0) {
             toast({ title: "Error", description: "Current value must be zero or positive for bank accounts and property.", variant: "destructive" });
             return;
@@ -277,7 +278,7 @@ export default function AssetsPage() {
     if (currentAsset.id) {
       const payloadForUpdate: Partial<ContextAsset> & { id: string } = {
         id: currentAsset.id,
-        name: currentAsset.name!,
+        name: finalName!,
         category: currentAsset.category!,
         currency: currentAsset.currency!,
         quantity: quantityToSave,
@@ -292,35 +293,35 @@ export default function AssetsPage() {
       toast({ title: "Asset Updated", description: `${payloadForUpdate.name} has been updated.` });
     } else {
       const newAssetPayload: Omit<ContextAsset, 'id' | 'lastUpdated' | 'lastPriceUpdate' | 'priceHistory' | 'priceFetchError' | 'currentPrice' | 'previousClosePrice'> & { purchasePrice?: number; currentPrice?: number; tickerSymbol?: string; } = {
-        name: currentAsset.name!,
+        name: finalName!,
         category: currentAsset.category!,
         currency: currentAsset.currency!,
         quantity: quantityToSave,
       };
       if (isTrackableCategory) {
         newAssetPayload.purchasePrice = Number(currentAsset.purchasePrice) || 0;
-        newAssetPayload.tickerSymbol = finalTickerSymbol;
-      } else { // Bank or property
+        newAssetPayload.tickerSymbol = finalTickerSymbol; // Already set by suggestion click
+      } else {
         newAssetPayload.currentPrice = Number(currentAsset.currentPrice) || 0;
       }
-      addedAssetWithId = addAsset(newAssetPayload); // Assuming addAsset returns the full new asset with ID
+      addedAssetWithId = addAsset(newAssetPayload);
       toast({ title: "Asset Added", description: `${newAssetPayload.name} has been added.` });
     }
     setIsFormOpen(false);
     setCurrentAsset(initialAssetFormState);
-    setTickerSearchQuery('');
-    setTickerSuggestions([]);
-    setShowTickerSuggestionsPopover(false);
+    setCompanyNameSearchQuery('');
+    setCompanyNameSuggestions([]);
+    setShowCompanyNameSuggestionsPopover(false);
 
     if (addedAssetWithId && isTrackableCategory && addedAssetWithId.tickerSymbol) {
         handleRefreshPrice(addedAssetWithId);
         if (addedAssetWithId.category) {
            setInitialRefreshPerformedForTab(prev => ({ ...prev, [addedAssetWithId!.category as string]: false }));
         }
-    } else if (currentAsset.id && isTrackableCategory) { // If editing an existing trackable asset
+    } else if (currentAsset.id && isTrackableCategory) {
         const existingAsset = allAssets.find(a => a.id === currentAsset.id);
-        if (existingAsset && (existingAsset.tickerSymbol !== finalTickerSymbol || existingAsset.currency !== currentAsset.currency)) {
-            handleRefreshPrice({...existingAsset, tickerSymbol: finalTickerSymbol, currency: currentAsset.currency!});
+        if (existingAsset && (existingAsset.tickerSymbol !== finalTickerSymbol || existingAsset.name !== finalName || existingAsset.currency !== currentAsset.currency)) {
+             handleRefreshPrice({...existingAsset, name: finalName!, tickerSymbol: finalTickerSymbol, currency: currentAsset.currency!});
         }
     }
   };
@@ -375,21 +376,21 @@ export default function AssetsPage() {
     const isNewCategoryTrackable = value === 'stock' || value === 'crypto' || value === 'mutualfund';
 
     if (isNewCategoryTrackable) {
-        newState.tickerSymbol = currentAsset?.tickerSymbol || '';
-        setTickerSearchQuery(currentAsset?.tickerSymbol || ''); // Keep existing ticker if applicable
+        setCompanyNameSearchQuery(currentAsset?.name || ''); // Keep existing name for search
         newState.purchasePrice = currentAsset?.purchasePrice === undefined ? 0 : currentAsset.purchasePrice;
         newState.quantity = (currentAsset?.quantity === undefined || (currentAsset.quantity === 1 && (currentAsset.category === 'bank' || currentAsset.category === 'property'))) ? 1 : currentAsset.quantity;
-        delete newState.currentPrice; // Remove currentPrice as it's fetched
-    } else { // Bank or Property
+        newState.tickerSymbol = currentAsset?.tickerSymbol || ''; // Keep ticker if already set
+        delete newState.currentPrice;
+    } else {
         newState.currentPrice = currentAsset?.currentPrice === undefined ? 0 : currentAsset.currentPrice;
-        newState.quantity = 1; // Bank/Property always quantity 1
+        newState.quantity = 1;
+        setCompanyNameSearchQuery(currentAsset?.name || ''); // Keep name
         delete newState.tickerSymbol;
-        setTickerSearchQuery('');
         delete newState.purchasePrice;
     }
     setCurrentAsset(newState);
-    setTickerSuggestions([]); // Clear suggestions on category change
-    setShowTickerSuggestionsPopover(false);
+    setCompanyNameSuggestions([]);
+    setShowCompanyNameSuggestionsPopover(false);
   };
 
   const debounce = <F extends (...args: any[]) => void>(func: F, delay: number) => {
@@ -402,50 +403,52 @@ export default function AssetsPage() {
     };
   };
 
-  const performTickerSearch = useCallback(async (query: string) => {
+  const performCompanyNameSearch = useCallback(async (query: string) => {
     if (!query || query.trim().length < 1) {
-      setTickerSuggestions([]);
-      setShowTickerSuggestionsPopover(false);
+      setCompanyNameSuggestions([]);
+      setShowCompanyNameSuggestionsPopover(false);
       return;
     }
-    setIsTickerSearching(true);
+    setIsCompanyNameSearching(true);
     try {
       const results = await searchTickerSymbols(query);
-      setTickerSuggestions(results);
-      setShowTickerSuggestionsPopover(results.length > 0 || query.trim().length > 0);
+      setCompanyNameSuggestions(results);
+      setShowCompanyNameSuggestionsPopover(results.length > 0 || query.trim().length > 0);
     } catch (error) {
-      console.error("Ticker search failed:", error);
-      setTickerSuggestions([]);
-      setShowTickerSuggestionsPopover(query.trim().length > 0); // Keep popover open to show error/no results
-      toast({ title: "Search Error", description: "Could not fetch ticker suggestions.", variant: "destructive" });
+      console.error("Company name search failed:", error);
+      setCompanyNameSuggestions([]);
+      setShowCompanyNameSuggestionsPopover(query.trim().length > 0);
+      toast({ title: "Search Error", description: "Could not fetch company/asset suggestions.", variant: "destructive" });
     } finally {
-      setIsTickerSearching(false);
+      setIsCompanyNameSearching(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const debouncedTickerSearch = useCallback(debounce(performTickerSearch, 500), [performTickerSearch]);
+  const debouncedCompanyNameSearch = useCallback(debounce(performCompanyNameSearch, 500), [performCompanyNameSearch]);
 
-  const handleTickerInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCompanyNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
-    setTickerSearchQuery(query);
-    if (query.trim().length > 0) {
-      debouncedTickerSearch(query);
+    setCompanyNameSearchQuery(query);
+    setCurrentAsset(prev => ({ ...prev, name: query, tickerSymbol: '' })); // Clear ticker if name changes manually
+    if (query.trim().length > 0 && isCurrentAssetTrackable) {
+      debouncedCompanyNameSearch(query);
     } else {
-      setTickerSuggestions([]);
-      setShowTickerSuggestionsPopover(false);
+      setCompanyNameSuggestions([]);
+      setShowCompanyNameSuggestionsPopover(false);
     }
   };
 
-  const handleSuggestionClick = (suggestion: TickerSuggestion) => {
-    setTickerSearchQuery(suggestion.symbol);
+  const handleCompanyNameSuggestionClick = (suggestion: TickerSuggestion) => {
+    setCompanyNameSearchQuery(suggestion.name);
     setCurrentAsset(prev => ({
       ...prev,
-      tickerSymbol: suggestion.symbol,
-      name: prev?.name || suggestion.name, // Auto-fill name if empty
+      name: suggestion.name,
+      tickerSymbol: suggestion.symbol.toUpperCase(),
     }));
-    setTickerSuggestions([]);
-    setShowTickerSuggestionsPopover(false);
+    setCompanyNameSuggestions([]);
+    setShowCompanyNameSuggestionsPopover(false);
   };
 
 
@@ -483,12 +486,12 @@ export default function AssetsPage() {
 
     let allTimeGainLoss = 0;
     let allTimeGainLossPercent = 0;
-    if (isTrackableAsset && asset.currentPrice !== undefined && asset.purchasePrice !== undefined && asset.purchasePrice !== 0) {
+    if (isTrackableAsset && asset.currentPrice !== undefined && asset.purchasePrice !== undefined && asset.purchasePrice !== undefined) {
       allTimeGainLoss = (asset.currentPrice - asset.purchasePrice) * asset.quantity;
       const totalPurchaseCostForAsset = asset.purchasePrice * asset.quantity;
        if (totalPurchaseCostForAsset !== 0) {
          allTimeGainLossPercent = (allTimeGainLoss / totalPurchaseCostForAsset) * 100;
-       } else if (allTimeGainLoss !== 0) { // Gain on zero cost (e.g. airdrop)
+       } else if (allTimeGainLoss !== 0) {
          allTimeGainLossPercent = allTimeGainLoss > 0 ? Infinity : -Infinity;
        }
     }
@@ -512,7 +515,7 @@ export default function AssetsPage() {
                 {asset.quantity.toLocaleString()} { asset.category === 'stock' ? 'shares' : asset.category === 'crypto' ? 'coins' : 'units'} @ {formatCurrency(asset.currentPrice, asset.currency)}/unit
               </p>
             )}
-             {!isTrackableAsset && ( // For Bank & Property
+             {!isTrackableAsset && (
               <p className="text-xs text-muted-foreground">
                 Current Value
               </p>
@@ -572,9 +575,9 @@ export default function AssetsPage() {
             }
           </p>
           {asset.priceFetchError && (
-            <p className="text-xs text-destructive mt-1">
-              <AlertTriangle className="inline h-3 w-3 mr-1" />
-              {asset.priceFetchError}
+            <p className="text-xs text-destructive mt-1 flex items-center">
+              <AlertTriangle className="inline h-3 w-3 mr-1 shrink-0" />
+              <span className="break-words">{asset.priceFetchError}</span>
             </p>
           )}
         </CardContent>
@@ -597,12 +600,12 @@ export default function AssetsPage() {
     );
   };
 
-  const assetLabelMap: Record<AssetCategory, { name: string, quantity: string, purchasePrice: string, ticker: string }> = {
-    stock: { name: "Company Name", quantity: "Number of Shares", purchasePrice: "Purchase Price per Share", ticker: "Ticker Symbol" },
-    crypto: { name: "Cryptocurrency Name", quantity: "Quantity Owned", purchasePrice: "Purchase Price per Unit", ticker: "Symbol" },
-    mutualfund: { name: "Fund Name", quantity: "Units Held", purchasePrice: "Purchase Price per Unit", ticker: "Symbol" },
-    bank: { name: "Account Nickname", quantity: "N/A", purchasePrice: "N/A", ticker: "N/A" },
-    property: { name: "Property Name", quantity: "N/A", purchasePrice: "N/A", ticker: "N/A" },
+  const assetLabelMap: Record<AssetCategory, { name: string, quantity: string, purchasePrice: string }> = {
+    stock: { name: "Company Name", quantity: "Number of Shares", purchasePrice: "Purchase Price per Share" },
+    crypto: { name: "Cryptocurrency Name", quantity: "Quantity Owned", purchasePrice: "Purchase Price per Unit" },
+    mutualfund: { name: "Fund Name", quantity: "Units Held", purchasePrice: "Purchase Price per Unit" },
+    bank: { name: "Account Nickname", quantity: "N/A", purchasePrice: "N/A" },
+    property: { name: "Property Name", quantity: "N/A", purchasePrice: "N/A" },
   };
 
   const currentAssetLabels = assetLabelMap[currentAsset?.category || 'stock'];
@@ -619,11 +622,11 @@ export default function AssetsPage() {
         </div>
         <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
             setIsFormOpen(isOpen);
-            if (!isOpen) { // Reset form state on close
+            if (!isOpen) {
                 setCurrentAsset(initialAssetFormState);
-                setTickerSearchQuery('');
-                setTickerSuggestions([]);
-                setShowTickerSuggestionsPopover(false);
+                setCompanyNameSearchQuery('');
+                setCompanyNameSuggestions([]);
+                setShowCompanyNameSuggestionsPopover(false);
             }
         }}>
         <DialogTrigger asChild>
@@ -642,8 +645,63 @@ export default function AssetsPage() {
             <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="name" className="text-right">{currentAssetLabels.name}</Label>
-                <div className="col-span-3">
-                <Input id="name" value={currentAsset?.name || ''} onChange={(e) => setCurrentAsset({...currentAsset, name: e.target.value })} placeholder={`e.g. ${currentAsset?.category === 'bank' ? 'Main Savings' : currentAsset?.category === 'property' ? 'Downtown Condo' : currentAsset?.category === 'stock' ? 'Apple Inc.' : currentAsset?.category === 'crypto' ? 'Bitcoin' : 'Vanguard S&P 500 ETF'}`} />
+                 <div className="col-span-3">
+                    <Popover open={showCompanyNameSuggestionsPopover && isCurrentAssetTrackable} onOpenChange={setShowCompanyNameSuggestionsPopover}>
+                        <PopoverTrigger asChild>
+                            <Input
+                                id="name"
+                                value={companyNameSearchQuery}
+                                onChange={handleCompanyNameInputChange}
+                                onFocus={() => {
+                                    if (companyNameSearchQuery.trim().length > 0 && companyNameSuggestions.length > 0 && isCurrentAssetTrackable) {
+                                      setShowCompanyNameSuggestionsPopover(true);
+                                    }
+                                }}
+                                placeholder={isCurrentAssetTrackable ? `Type to search ${currentAsset?.category || 'asset'}...` : `e.g. ${currentAsset?.category === 'bank' ? 'Main Savings' : 'Downtown Condo'}`}
+                             />
+                        </PopoverTrigger>
+                         <PopoverContent
+                            className="w-[--radix-popover-trigger-width] p-0"
+                            side="bottom"
+                            align="start"
+                            onOpenAutoFocus={(e) => e.preventDefault()}
+                          >
+                            {isCompanyNameSearching && (
+                                <div className="p-2 text-sm text-muted-foreground flex items-center justify-center">
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Searching...
+                                </div>
+                            )}
+                            {!isCompanyNameSearching && companyNameSuggestions.length === 0 && companyNameSearchQuery.length > 0 && isCurrentAssetTrackable && (
+                                <div className="p-2 text-sm text-muted-foreground text-center">No results found.</div>
+                            )}
+                            {!isCompanyNameSearching && companyNameSuggestions.length > 0 && isCurrentAssetTrackable && (
+                                <div className="max-h-48 overflow-y-auto">
+                                    {companyNameSuggestions.map((suggestion, index) => (
+                                        <Button
+                                            key={index}
+                                            variant="ghost"
+                                            className="w-full justify-start p-2 text-left h-auto rounded-none"
+                                            onClick={() => handleCompanyNameSuggestionClick(suggestion)}
+                                        >
+                                            <div className="flex flex-col">
+                                                <span className="font-semibold">{suggestion.symbol}</span>
+                                                <span className="text-xs text-muted-foreground">{suggestion.name}</span>
+                                            </div>
+                                        </Button>
+                                    ))}
+                                </div>
+                            )}
+                        </PopoverContent>
+                    </Popover>
+                     {isCurrentAssetTrackable && currentAsset?.tickerSymbol && (
+                        <p className="text-xs text-muted-foreground mt-1">Selected Ticker: <span className="font-semibold">{currentAsset.tickerSymbol}</span></p>
+                    )}
+                    {isCurrentAssetTrackable && (
+                         <p className="text-xs text-muted-foreground mt-1">
+                            <Search className="inline h-3 w-3 mr-1" />
+                            For Stocks, Crypto, Mutual Funds: Type name to search and auto-fill ticker.
+                        </p>
+                    )}
                 </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
@@ -679,63 +737,6 @@ export default function AssetsPage() {
             {isCurrentAssetTrackable && (
                 <>
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="tickerSymbolInput" className="text-right">{currentAssetLabels.ticker}</Label>
-                    <div className="col-span-3">
-                    <Popover open={showTickerSuggestionsPopover} onOpenChange={setShowTickerSuggestionsPopover}>
-                        <PopoverTrigger asChild>
-                            <Input
-                                id="tickerSymbolInput"
-                                value={tickerSearchQuery}
-                                onChange={handleTickerInputChange}
-                                onFocus={() => {
-                                    if (tickerSearchQuery.trim().length > 0 && tickerSuggestions.length > 0) {
-                                      setShowTickerSuggestionsPopover(true);
-                                    }
-                                }}
-                                placeholder={currentAsset?.category === 'stock' ? 'e.g. AAPL' : currentAsset?.category === 'crypto' ? 'e.g. BTCUSD' : 'e.g. VOO'}
-                             />
-                        </PopoverTrigger>
-                         <PopoverContent
-                            className="w-[--radix-popover-trigger-width] p-0"
-                            side="bottom"
-                            align="start"
-                            onOpenAutoFocus={(e) => e.preventDefault()}
-                          >
-                            {isTickerSearching && (
-                                <div className="p-2 text-sm text-muted-foreground flex items-center justify-center">
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Searching...
-                                </div>
-                            )}
-                            {!isTickerSearching && tickerSuggestions.length === 0 && tickerSearchQuery.length > 0 && (
-                                <div className="p-2 text-sm text-muted-foreground text-center">No results found.</div>
-                            )}
-                            {!isTickerSearching && tickerSuggestions.length > 0 && (
-                                <div className="max-h-48 overflow-y-auto">
-                                    {tickerSuggestions.map((suggestion, index) => (
-                                        <Button
-                                            key={index}
-                                            variant="ghost"
-                                            className="w-full justify-start p-2 text-left h-auto rounded-none"
-                                            onClick={() => handleSuggestionClick(suggestion)}
-                                        >
-                                            <div className="flex flex-col">
-                                                <span className="font-semibold">{suggestion.symbol}</span>
-                                                <span className="text-xs text-muted-foreground">{suggestion.name}</span>
-                                            </div>
-                                        </Button>
-                                    ))}
-                                </div>
-                            )}
-                        </PopoverContent>
-                    </Popover>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        For stocks, use the official ticker (e.g., GOOGL, MSFT). For crypto, use symbol with 'USD' (e.g., BTCUSD, ETHUSD) if prices are USD-based. For Indian mutual funds, use the scheme code if known.
-                        <br/>
-                        <Search className="inline h-3 w-3 mr-1" />Tip: Search online for "[Company/Crypto Name] ticker symbol" or "[Fund Name] scheme code". Type to search for tickers.
-                    </p>
-                    </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="purchasePrice" className="text-right">{currentAssetLabels.purchasePrice}</Label>
                     <Input id="purchasePrice" type="number" value={currentAsset?.purchasePrice === undefined ? '' : currentAsset.purchasePrice} onChange={(e) => setCurrentAsset({...currentAsset, purchasePrice: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder="Price per unit at purchase" />
                 </div>
@@ -751,10 +752,10 @@ export default function AssetsPage() {
             <DialogFooter>
             <Button type="button" variant="outline" onClick={() => {
                 setIsFormOpen(false);
-                setCurrentAsset(initialAssetFormState); // Reset on cancel
-                setTickerSearchQuery('');
-                setTickerSuggestions([]);
-                setShowTickerSuggestionsPopover(false);
+                setCurrentAsset(initialAssetFormState);
+                setCompanyNameSearchQuery('');
+                setCompanyNameSuggestions([]);
+                setShowCompanyNameSuggestionsPopover(false);
             }}>Cancel</Button>
             <Button type="submit" onClick={handleSaveAsset}>Save Asset</Button>
             </DialogFooter>
@@ -845,7 +846,7 @@ export default function AssetsPage() {
                         const isTrackableCategoryForTab = category === 'stock' || category === 'crypto' || category === 'mutualfund';
 
                         const assetsInThisCurrencyAndCategory = allAssets.filter(a => a.category === category && a.currency === currency);
-                        if (assetsInThisCurrencyAndCategory.length === 0 && totalData.marketValue === 0) { // Don't show if no assets AND no value for this currency/category
+                        if (assetsInThisCurrencyAndCategory.length === 0 && totalData.marketValue === 0) {
                             return null;
                         }
 
@@ -882,7 +883,7 @@ export default function AssetsPage() {
                             </div>
                         );
                     })}
-                     {allAssets.filter(a => a.category === category).length === 0 && ( // Show if there are no assets in this category at all
+                     {allAssets.filter(a => a.category === category).length === 0 && (
                         <p className="text-muted-foreground">No assets in this category yet. Add one using the button above.</p>
                     )}
                     </CardContent>
@@ -898,7 +899,7 @@ export default function AssetsPage() {
                     </Card>
                 )}
 
-                <div className="grid gap-6 md:grid-cols-1"> {/* Ensure single column for asset cards within tabs */}
+                <div className="grid gap-6 md:grid-cols-1">
                     {displayedAssets.map((asset) => (
                         <AssetCardComponent key={asset.id} asset={asset} />
                     ))}
@@ -915,4 +916,3 @@ export default function AssetsPage() {
     </div>
   );
 }
-
