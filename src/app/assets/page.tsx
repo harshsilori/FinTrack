@@ -10,14 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; // Popover still used for other things potentially, or can be removed if not.
 import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, AlertTriangle, Search, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { useToast } from "@/hooks/use-toast";
 import { useAssets, type Asset as ContextAsset, type AssetCategory } from '@/contexts/AssetContext';
-import { fetchAssetPrice, searchTickerSymbols, type TickerSuggestion } from '@/services/marketService';
+import { fetchAssetPrice } from '@/services/marketService';
 import Link from 'next/link';
 
 const assetIcons: Record<AssetCategory, React.ReactNode> = {
@@ -72,12 +72,6 @@ export default function AssetsPage() {
   const [isFetchingPrice, setIsFetchingPrice] = useState<Record<string, boolean>>({});
   const [initialRefreshPerformedForTab, setInitialRefreshPerformedForTab] = useState<Record<string, boolean>>({});
 
-  // State for company name search and suggestions
-  const [companyNameSearchQuery, setCompanyNameSearchQuery] = useState('');
-  const [companyNameSuggestions, setCompanyNameSuggestions] = useState<TickerSuggestion[]>([]);
-  const [isCompanyNameSearching, setIsCompanyNameSearching] = useState(false);
-  const [showCompanyNameSuggestionsPopover, setShowCompanyNameSuggestionsPopover] = useState(false);
-
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -99,14 +93,13 @@ export default function AssetsPage() {
       params.set('category', newTabValue);
     }
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
-    // No longer need to reset initialRefreshPerformedForTab here, as the useEffect for tab refresh handles it.
   };
 
   const displayedAssets = useMemo(() => {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return []; // No assets displayed directly under "Overview" tab, only the snapshot cards
+    return []; 
   }, [allAssets, activeTab]);
 
   const isCurrentAssetTrackable = useMemo(() => {
@@ -117,13 +110,12 @@ export default function AssetsPage() {
   const openForm = (asset?: ContextAsset) => {
     if (asset) {
       setCurrentAsset({ ...asset });
-      setCompanyNameSearchQuery(asset.name || ''); 
     } else {
       const prefilledCategory = (activeTab && activeTab !== 'overview') ? activeTab : 'stock';
       const newInitialState: Partial<ContextAsset> = {
         ...initialAssetFormState,
         category: prefilledCategory as AssetCategory,
-        currency: 'USD', // Default currency
+        currency: 'USD', 
       };
       if (prefilledCategory === 'bank' || prefilledCategory === 'property') {
         newInitialState.quantity = 1;
@@ -135,10 +127,7 @@ export default function AssetsPage() {
         newInitialState.tickerSymbol = '';
       }
       setCurrentAsset(newInitialState);
-      setCompanyNameSearchQuery(newInitialState.name || '');
     }
-    setCompanyNameSuggestions([]);
-    setShowCompanyNameSuggestionsPopover(false);
     setIsFormOpen(true);
   };
 
@@ -159,7 +148,7 @@ export default function AssetsPage() {
     }
 
     if (!asset.tickerSymbol && (asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund')) {
-        const missingTickerError = `Ticker missing for ${asset.name}. Cannot refresh price. Please edit the asset and use the name search to select a valid ticker.`;
+        const missingTickerError = `Ticker missing for ${asset.name}. Cannot refresh price. Please edit the asset and add a valid ticker.`;
         updateAssetPrice(asset.id, {
             currentPrice: asset.currentPrice || 0,
             previousClosePrice: asset.previousClosePrice || asset.currentPrice || 0,
@@ -174,19 +163,12 @@ export default function AssetsPage() {
     try {
       priceData = await fetchAssetPrice(asset.category, asset.tickerSymbol, asset.currency);
       updateAssetPrice(asset.id!, priceData);
-      // No toasts for automatic refreshes to prevent bombardment
-      // if (!priceData.priceFetchError?.toLowerCase().includes("error") && !priceData.priceFetchError?.toLowerCase().includes("failed")) {
-      //   if (!(priceData.priceFetchError?.includes("mock data") || priceData.priceFetchError?.includes("Manual value."))) {
-      //        // toast({ title: "Price Updated", description: `Price for ${asset.name} refreshed.` }); 
-      //   }
-      // }
     } catch (error) {
       let detailedError = "Could not refresh price due to an unknown error.";
       if (error instanceof Error) {
           detailedError = `Could not refresh price for ${asset.name}. Error: ${error.message}.`;
       }
       console.error("Failed to fetch price:", error);
-      // toast({ title: "Fetch Error", description: detailedError, variant: "destructive" }); // Potentially too many toasts
       updateAssetPrice(asset.id!, {
         currentPrice: asset.currentPrice || 0,
         previousClosePrice: asset.previousClosePrice || asset.currentPrice || 0,
@@ -196,7 +178,7 @@ export default function AssetsPage() {
     } finally {
       setIsFetchingPrice(prev => ({ ...prev, [asset.id!]: false }));
     }
-  }, [toast, updateAssetPrice]);
+  }, [updateAssetPrice]); // Removed toast from dependencies as it's not used here anymore
 
 
   useEffect(() => {
@@ -220,7 +202,7 @@ export default function AssetsPage() {
                     await handleRefreshPrice(asset);
                     refreshedCount++;
                     if (refreshedCount < assetsInTabToRefresh.length) { 
-                      await new Promise(resolve => setTimeout(resolve, 500)); // Stagger API calls
+                      await new Promise(resolve => setTimeout(resolve, 500)); 
                     }
                 }
             }
@@ -232,25 +214,24 @@ export default function AssetsPage() {
       performTabRefresh();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, allAssets, handleRefreshPrice]); // initialRefreshPerformedForTab removed to allow re-check on asset changes if needed
+  }, [activeTab, allAssets, handleRefreshPrice, initialRefreshPerformedForTab]);
 
 
   const handleSaveAsset = () => {
-    if (!currentAsset || !companyNameSearchQuery || !currentAsset.category || !currentAsset.currency) {
+    if (!currentAsset || !currentAsset.name || !currentAsset.category || !currentAsset.currency) {
       toast({ title: "Error", description: "Please fill name, category, and currency.", variant: "destructive" });
       return;
     }
 
     const isTrackableCategory = currentAsset.category === 'stock' || currentAsset.category === 'crypto' || currentAsset.category === 'mutualfund';
     
-    const finalName = companyNameSearchQuery;
+    const finalName = currentAsset.name;
     const quantityToSave = (currentAsset.category === 'bank' || currentAsset.category === 'property') ? 1 : (Number(currentAsset.quantity) || 0);
     const finalTickerSymbol = isTrackableCategory ? currentAsset.tickerSymbol?.toUpperCase() : undefined;
 
-
     if (isTrackableCategory) {
         if (!finalTickerSymbol) {
-            toast({ title: "Error", description: "Ticker symbol is required for stocks, crypto, and mutual funds. Please select an asset name from the suggestions or ensure a valid ticker is present.", variant: "destructive" });
+            toast({ title: "Error", description: "Ticker symbol is required for stocks, crypto, and mutual funds.", variant: "destructive" });
             return;
         }
          if (currentAsset.quantity === undefined || currentAsset.quantity <= 0) {
@@ -261,7 +242,7 @@ export default function AssetsPage() {
             toast({ title: "Error", description: "Purchase price must be zero or positive for trackable assets.", variant: "destructive" });
             return;
         }
-    } else { // Bank or Property
+    } else { 
         if (currentAsset.currentPrice === undefined || currentAsset.currentPrice < 0) {
             toast({ title: "Error", description: "Current value must be zero or positive for bank accounts and property.", variant: "destructive" });
             return;
@@ -302,21 +283,18 @@ export default function AssetsPage() {
         newAssetPayload.currentPrice = Number(currentAsset.currentPrice) || 0;
       }
       addedAssetWithId = addAsset(newAssetPayload);
-      existingAssetId = addedAssetWithId.id; // Capture the new ID
+      existingAssetId = addedAssetWithId.id; 
       toast({ title: "Asset Added", description: `${newAssetPayload.name} has been added.` });
     }
     setIsFormOpen(false);
     setCurrentAsset(initialAssetFormState);
-    setCompanyNameSearchQuery('');
-    setCompanyNameSuggestions([]);
-    setShowCompanyNameSuggestionsPopover(false);
 
     if (isTrackableCategory && existingAssetId) {
         const assetToRefresh = allAssets.find(a => a.id === existingAssetId);
         if (assetToRefresh) {
              const effectiveAssetToRefresh = addedAssetWithId ? addedAssetWithId : {...assetToRefresh, name: finalName, tickerSymbol: finalTickerSymbol, currency: currentAsset.currency!};
              handleRefreshPrice(effectiveAssetToRefresh);
-        } else if (addedAssetWithId) { // if it was a new asset, assetToRefresh might be undefined if allAssets hasn't updated yet
+        } else if (addedAssetWithId) { 
              handleRefreshPrice(addedAssetWithId);
         }
         if (categoryOfSavedAsset) {
@@ -370,12 +348,11 @@ export default function AssetsPage() {
   }, [allAssets, activeTab, calculateTotals]);
 
 
-  const handleCategoryChange = (value: AssetCategory) => {
+  const handleCategoryChangeInForm = (value: AssetCategory) => {
     const newState: Partial<ContextAsset> = { ...currentAsset, category: value };
     const isNewCategoryTrackable = value === 'stock' || value === 'crypto' || value === 'mutualfund';
 
     if (isNewCategoryTrackable) {
-        setCompanyNameSearchQuery(currentAsset?.name || ''); 
         newState.purchasePrice = currentAsset?.purchasePrice === undefined ? 0 : currentAsset.purchasePrice;
         newState.quantity = (currentAsset?.quantity === undefined || (currentAsset.quantity === 1 && (currentAsset.category === 'bank' || currentAsset.category === 'property'))) ? 1 : currentAsset.quantity;
         newState.tickerSymbol = currentAsset?.tickerSymbol || ''; 
@@ -383,76 +360,11 @@ export default function AssetsPage() {
     } else {
         newState.currentPrice = currentAsset?.currentPrice === undefined ? 0 : currentAsset.currentPrice;
         newState.quantity = 1;
-        setCompanyNameSearchQuery(currentAsset?.name || ''); 
         delete newState.tickerSymbol;
         delete newState.purchasePrice;
     }
     setCurrentAsset(newState);
-    setCompanyNameSuggestions([]);
-    setShowCompanyNameSuggestionsPopover(false);
   };
-
-  const debounce = <F extends (...args: any[]) => void>(func: F, delay: number) => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-    return (...args: Parameters<F>) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        func(...args);
-      }, delay);
-    };
-  };
-
-  const performCompanyNameSearch = useCallback(async (query: string) => {
-    if (!query || query.trim().length < 1) {
-      setCompanyNameSuggestions([]);
-      setShowCompanyNameSuggestionsPopover(false);
-      return;
-    }
-    setIsCompanyNameSearching(true);
-    try {
-      const results = await searchTickerSymbols(query);
-      setCompanyNameSuggestions(results);
-      setShowCompanyNameSuggestionsPopover(results.length > 0 || query.trim().length > 0);
-    } catch (error) {
-      console.error("Company name search failed:", error);
-      setCompanyNameSuggestions([]);
-      setShowCompanyNameSuggestionsPopover(query.trim().length > 0); 
-      toast({ title: "Search Error", description: "Could not fetch company/asset suggestions.", variant: "destructive" });
-    } finally {
-      setIsCompanyNameSearching(false);
-    }
-  }, [toast]); // Added toast to dependency array
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const debouncedCompanyNameSearch = useCallback(debounce(performCompanyNameSearch, 500), [performCompanyNameSearch]);
-
-  const handleCompanyNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value;
-    setCompanyNameSearchQuery(query); 
-
-    // Do NOT update currentAsset here to prevent input issues.
-    // Ticker clearing or name updates happen on suggestion click or save.
-
-    if (query.trim().length > 0 && isCurrentAssetTrackable) {
-      debouncedCompanyNameSearch(query);
-    } else {
-      setCompanyNameSuggestions([]);
-      setShowCompanyNameSuggestionsPopover(false);
-    }
-  };
-
-
-  const handleCompanyNameSuggestionClick = (suggestion: TickerSuggestion) => {
-    setCompanyNameSearchQuery(suggestion.name); // Update input field display
-    setCurrentAsset(prev => ({
-      ...prev,
-      name: suggestion.name, 
-      tickerSymbol: suggestion.symbol.toUpperCase(),
-    }));
-    setCompanyNameSuggestions([]);
-    setShowCompanyNameSuggestionsPopover(false);
-  };
-
 
   const AssetCardComponent = ({ asset }: { asset: ContextAsset }) => {
     const marketValue = getAssetMarketValue(asset);
@@ -465,7 +377,7 @@ export default function AssetsPage() {
       let priceUpdateText: string | null = null;
       if (asset.lastPriceUpdate) {
         priceUpdateText = `Price as of: ${new Date(asset.lastPriceUpdate).toLocaleTimeString()} ${new Date(asset.lastPriceUpdate).toLocaleDateString()}`;
-      } else if (isTrackableAsset && asset.currentPrice === undefined) { // Check currentPrice as well
+      } else if (isTrackableAsset && asset.currentPrice === undefined) { 
         priceUpdateText = 'Price not yet updated';
       }
       setClientFormattedLastPriceUpdate(priceUpdateText);
@@ -602,12 +514,12 @@ export default function AssetsPage() {
     );
   };
 
-  const assetLabelMap: Record<AssetCategory, { name: string, quantity: string, purchasePrice: string }> = {
-    stock: { name: "Company Name", quantity: "Number of Shares", purchasePrice: "Purchase Price per Share" },
-    crypto: { name: "Cryptocurrency Name", quantity: "Quantity Owned", purchasePrice: "Purchase Price per Unit" },
-    mutualfund: { name: "Fund Name", quantity: "Units Held", purchasePrice: "Purchase Price per Unit" },
-    bank: { name: "Account Nickname", quantity: "N/A", purchasePrice: "N/A" }, 
-    property: { name: "Property Name", quantity: "N/A", purchasePrice: "N/A" },
+  const assetLabelMap: Record<AssetCategory, { name: string, quantity: string, purchasePrice: string, tickerSymbol: string }> = {
+    stock: { name: "Company Name", quantity: "Number of Shares", purchasePrice: "Purchase Price per Share", tickerSymbol: "Stock Ticker (e.g., AAPL)" },
+    crypto: { name: "Cryptocurrency Name", quantity: "Quantity Owned", purchasePrice: "Purchase Price per Unit", tickerSymbol: "Crypto Symbol (e.g., BTCUSD)" },
+    mutualfund: { name: "Fund Name", quantity: "Units Held", purchasePrice: "Purchase Price per Unit", tickerSymbol: "Fund Symbol (e.g., VOO)" },
+    bank: { name: "Account Nickname", quantity: "N/A", purchasePrice: "N/A", tickerSymbol: "N/A" }, 
+    property: { name: "Property Name", quantity: "N/A", purchasePrice: "N/A", tickerSymbol: "N/A" },
   };
 
   const currentAssetLabels = assetLabelMap[currentAsset?.category || 'stock'];
@@ -626,9 +538,6 @@ export default function AssetsPage() {
             setIsFormOpen(isOpen);
             if (!isOpen) {
                 setCurrentAsset(initialAssetFormState);
-                setCompanyNameSearchQuery('');
-                setCompanyNameSuggestions([]);
-                setShowCompanyNameSuggestionsPopover(false);
             }
         }}>
         <DialogTrigger asChild>
@@ -648,76 +557,48 @@ export default function AssetsPage() {
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="name" className="text-right">{currentAssetLabels.name}</Label>
                  <div className="col-span-3">
-                    <Popover open={showCompanyNameSuggestionsPopover && isCurrentAssetTrackable} onOpenChange={setShowCompanyNameSuggestionsPopover}>
-                        <PopoverTrigger asChild>
-                            <Input
-                                id="name"
-                                value={companyNameSearchQuery}
-                                onChange={handleCompanyNameInputChange}
-                                onFocus={() => {
-                                    // Show popover on focus only if trackable and there's potential for suggestions
-                                    if (isCurrentAssetTrackable) {
-                                      // If query exists, show popover to potentially display existing suggestions or "no results"
-                                      // If query is empty, it might be better to show popover only after some typing
-                                      if (companyNameSearchQuery.trim().length > 0 || companyNameSuggestions.length > 0) {
-                                          setShowCompanyNameSuggestionsPopover(true);
-                                      }
-                                      // If query exists but no suggestions AND not searching, try searching again
-                                      if (companyNameSearchQuery.trim().length > 0 && companyNameSuggestions.length === 0 && !isCompanyNameSearching) {
-                                        performCompanyNameSearch(companyNameSearchQuery);
-                                      }
-                                    }
-                                }}
-                                placeholder={isCurrentAssetTrackable ? `Type to search ${currentAsset?.category || 'asset'}...` : `e.g. ${currentAsset?.category === 'bank' ? 'Main Savings' : 'Downtown Condo'}`}
-                             />
-                        </PopoverTrigger>
-                         <PopoverContent
-                            className="w-[--radix-popover-trigger-width] p-0"
-                            side="bottom"
-                            align="start"
-                            onOpenAutoFocus={(e) => e.preventDefault()}
-                          >
-                            {isCompanyNameSearching && (
-                                <div className="p-2 text-sm text-muted-foreground flex items-center justify-center">
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Searching...
-                                </div>
-                            )}
-                            {!isCompanyNameSearching && companyNameSuggestions.length === 0 && companyNameSearchQuery.length > 0 && isCurrentAssetTrackable && (
-                                <div className="p-2 text-sm text-muted-foreground text-center">No results found. Try different keywords or check for typos.</div>
-                            )}
-                            {!isCompanyNameSearching && companyNameSuggestions.length > 0 && isCurrentAssetTrackable && (
-                                <div className="max-h-48 overflow-y-auto">
-                                    {companyNameSuggestions.map((suggestion, index) => (
-                                        <Button
-                                            key={index}
-                                            variant="ghost"
-                                            className="w-full justify-start p-2 text-left h-auto rounded-none"
-                                            onClick={() => handleCompanyNameSuggestionClick(suggestion)}
-                                        >
-                                            <div className="flex flex-col">
-                                                <span className="font-semibold">{suggestion.symbol}</span>
-                                                <span className="text-xs text-muted-foreground">{suggestion.name}</span>
-                                            </div>
-                                        </Button>
-                                    ))}
-                                </div>
-                            )}
-                        </PopoverContent>
-                    </Popover>
-                     {isCurrentAssetTrackable && currentAsset?.tickerSymbol && (
-                        <p className="text-xs text-muted-foreground mt-1">Selected Ticker: <span className="font-semibold">{currentAsset.tickerSymbol}</span></p>
-                    )}
-                    {isCurrentAssetTrackable && (
-                         <p className="text-xs text-muted-foreground mt-1">
-                            <Search className="inline h-3 w-3 mr-1" />
-                            For Stocks, Crypto, Mutual Funds: Type name to search and auto-fill ticker.
-                        </p>
-                    )}
+                    <Input
+                        id="name"
+                        value={currentAsset?.name || ''}
+                        onChange={(e) => setCurrentAsset(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder={
+                            currentAsset?.category === 'stock' ? 'e.g., Apple Inc.' :
+                            currentAsset?.category === 'crypto' ? 'e.g., Bitcoin' :
+                            currentAsset?.category === 'mutualfund' ? 'e.g., Vanguard S&P 500 ETF' :
+                            currentAsset?.category === 'bank' ? 'e.g., Main Savings Account' :
+                            'e.g., Downtown Condo'
+                        }
+                     />
                 </div>
             </div>
+
+            {isCurrentAssetTrackable && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="tickerSymbol" className="text-right">{currentAssetLabels.tickerSymbol}</Label>
+                    <Input
+                        id="tickerSymbol"
+                        value={currentAsset?.tickerSymbol || ''}
+                        onChange={(e) => setCurrentAsset(prev => ({ ...prev, tickerSymbol: e.target.value.toUpperCase() }))}
+                        className="col-span-3"
+                        placeholder={
+                            currentAsset?.category === 'stock' ? 'e.g., AAPL' :
+                            currentAsset?.category === 'crypto' ? 'e.g., BTCUSD' :
+                            currentAsset?.category === 'mutualfund' ? 'e.g., VOO' :
+                            ''
+                        }
+                    />
+                     <div className="col-span-4 text-xs text-muted-foreground text-center px-4">
+                        <Search className="inline h-3 w-3 mr-1" />
+                        For Stocks, Crypto, Mutual Funds: Enter the correct ticker symbol.
+                        Ex: AAPL for Apple, MSFT for Microsoft. For crypto, use symbol then currency (e.g., BTCUSD, ETHUSD).
+                        Check financial sites for correct symbols.
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="category" className="text-right">Category</Label>
-                <Select value={currentAsset?.category || 'stock'} onValueChange={handleCategoryChange}>
+                <Select value={currentAsset?.category || 'stock'} onValueChange={handleCategoryChangeInForm}>
                 <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select asset category" />
                 </SelectTrigger>
@@ -764,9 +645,6 @@ export default function AssetsPage() {
             <Button type="button" variant="outline" onClick={() => {
                 setIsFormOpen(false);
                 setCurrentAsset(initialAssetFormState);
-                setCompanyNameSearchQuery('');
-                setCompanyNameSuggestions([]);
-                setShowCompanyNameSuggestionsPopover(false);
             }}>Cancel</Button>
             <Button type="submit" onClick={handleSaveAsset}>Save Asset</Button>
             </DialogFooter>
@@ -928,3 +806,5 @@ export default function AssetsPage() {
     </div>
   );
 }
+
+    
