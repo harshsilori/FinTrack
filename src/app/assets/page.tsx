@@ -5,18 +5,18 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogTrigger, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, WalletCards, Coins, Info, AlertTriangle, Search, ArrowLeft, ExternalLink } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, ExternalLink, AlertTriangle, Search, Loader2, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+// ChartContainer, ChartTooltip, ChartTooltipContent are not used directly here anymore for asset cards
 import { useToast } from "@/hooks/use-toast";
 import { useAssets, type Asset as ContextAsset, type AssetCategory } from '@/contexts/AssetContext';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion'; // Assuming framer-motion is still a dependency for animations
 
 const assetIcons: Record<AssetCategory | 'overview', React.ReactNode> = {
   overview: <WalletCards className="h-5 w-5 text-muted-foreground" />,
@@ -58,15 +58,11 @@ const categoryDisplayNames: Record<AssetCategory | 'overview', string> = {
 
 const orderedAssetCategories: AssetCategory[] = ['bank', 'stock', 'crypto', 'property', 'mutualfund'];
 
+
 const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: ContextAsset, onEdit: (asset: ContextAsset) => void, onDelete: (id: string) => void }) => {
-  const marketValue = (asset.category === 'bank' || asset.category === 'property')
-    ? asset.currentPrice
-    : asset.currentPrice * (asset.quantity || 0);
-
   const isTrackableAsset = asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund';
-  
   const [clientFormattedLastUpdated, setClientFormattedLastUpdated] = useState<string | null>(null);
-
+  
   useEffect(() => {
     if (asset.lastUpdated) {
       setClientFormattedLastUpdated(new Date(asset.lastUpdated).toLocaleDateString());
@@ -75,6 +71,10 @@ const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: Con
     }
   }, [asset.lastUpdated]);
 
+
+  const marketValue = (asset.category === 'bank' || asset.category === 'property')
+    ? asset.currentPrice
+    : asset.currentPrice * (asset.quantity || 0);
 
   let allTimeGainLoss = 0;
   let allTimeGainLossPercent = 0;
@@ -92,6 +92,9 @@ const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: Con
     if (value === undefined) return 'N/A';
     return value.toLocaleString(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
+  
+  const iconToDisplay = assetIcons[asset.category] || assetIcons.overview;
+
 
   return (
       <motion.div
@@ -100,18 +103,18 @@ const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: Con
         whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
       >
       <Card className="rounded-2xl shadow-lg flex flex-col h-full">
-        <CardHeader className="flex flex-row items-start justify-between gap-4 p-4 sm:p-6">
+        <CardHeader className="flex flex-row items-start justify-between gap-4 p-3 sm:p-4">
           <div>
-            <CardTitle className="text-lg">{asset.name}</CardTitle>
+            <CardTitle className="text-md sm:text-lg">{asset.name}</CardTitle>
             <CardDescription className="capitalize text-xs sm:text-sm">
               {categoryDisplayNames[asset.category]} {asset.tickerSymbol && `(${asset.tickerSymbol})`} - {asset.currency}
             </CardDescription>
           </div>
-          {assetIcons[asset.category] ? React.cloneElement(assetIcons[asset.category] as React.ReactElement, { className: "h-8 w-8" }) : <WalletCards className="h-8 w-8" />}
+           {React.cloneElement(iconToDisplay as React.ReactElement, { className: "h-6 w-6 sm:h-8 sm:w-8" })}
         </CardHeader>
-        <CardContent className="flex-grow space-y-3 p-4 sm:p-6 pt-0">
-          <div className="space-y-1">
-            <p className="text-xl md:text-2xl font-semibold">{formatCurrency(marketValue, asset.currency)}</p>
+        <CardContent className="flex-grow space-y-2 p-3 sm:p-4 pt-0">
+          <div className="space-y-0.5">
+            <p className="text-lg sm:text-xl md:text-2xl font-semibold">{formatCurrency(marketValue, asset.currency)}</p>
             <p className="text-xs text-muted-foreground">
                 {asset.category === 'bank' || asset.category === 'property'
                 ? 'Current Value'
@@ -122,10 +125,10 @@ const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: Con
 
           {isTrackableAsset && asset.purchasePrice !== undefined && (
             <>
-              <div className="text-sm">
+              <div className="text-xs sm:text-sm">
                 <span className="font-medium">All-Time Gain/Loss: </span>
                 <span className={allTimeGainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                  {allTimeGainLoss >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1"/> : <AlertTriangle className="inline h-4 w-4 mr-1"/>}
+                  {allTimeGainLoss >= 0 ? <TrendingUp className="inline h-3 w-3 sm:h-4 sm:w-4 mr-1"/> : <AlertTriangle className="inline h-3 w-3 sm:h-4 sm:w-4 mr-1"/>}
                   {allTimeGainLoss >= 0 ? '+' : ''}{formatCurrency(allTimeGainLoss, asset.currency)} ({!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent) ? allTimeGainLossPercent.toFixed(2) : (asset.purchasePrice === 0 && allTimeGainLoss !== 0 ? "N/A" : "0.00")}%)
                 </span>
               </div>
@@ -134,16 +137,16 @@ const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: Con
               </p>
             </>
           )}
-          <p className="text-xs text-muted-foreground pt-2">
+          <p className="text-xs text-muted-foreground pt-1 sm:pt-2">
             Details last saved: {clientFormattedLastUpdated !== null ? clientFormattedLastUpdated : (asset.lastUpdated ? "Loading save date..." : "")}
           </p>
         </CardContent>
-        <CardFooter className="flex justify-end items-center gap-1 p-4 sm:p-6 pt-0">
-              <Button variant="ghost" size="icon" onClick={() => onEdit(asset)} aria-label="Edit asset">
-                <Edit3 className="h-4 w-4" />
+        <CardFooter className="flex justify-end items-center gap-1 p-3 sm:p-4 pt-0">
+              <Button variant="ghost" size="icon" onClick={() => onEdit(asset)} aria-label="Edit asset" className="h-7 w-7 sm:h-8 sm:w-8">
+                <Edit3 className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => onDelete(asset.id!)} aria-label="Delete asset">
-                <Trash2 className="h-4 w-4 text-destructive" />
+              <Button variant="ghost" size="icon" onClick={() => onDelete(asset.id!)} aria-label="Delete asset" className="h-7 w-7 sm:h-8 sm:w-8">
+                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-destructive" />
               </Button>
         </CardFooter>
       </Card>
@@ -157,19 +160,18 @@ export default function AssetsPage() {
   const { toast } = useToast();
   const { assets: allAssets, addAsset, updateAsset, deleteAsset: deleteAssetFromContext } = useAssets();
   
-  useEffect(() => {
-    console.log('[AssetsPage] Loaded allAssets:', JSON.stringify(allAssets));
-    if (allAssets.length === 0) {
-        console.warn('[AssetsPage] allAssets is empty. This might indicate an issue with AssetContext initialization or data being cleared.');
-    }
-  }, [allAssets]);
-
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentAssetForForm, setCurrentAssetForForm] = useState<Partial<ContextAsset>>(initialAssetFormState);
     
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
 
   const activeTab = useMemo(() => {
     const tabParam = searchParams.get('category') as AssetCategory | 'overview' | null;
@@ -261,7 +263,7 @@ export default function AssetsPage() {
       updateAsset({ id: currentAssetForForm.id, ...assetPayload });
       toast({ title: "Asset Updated", description: `${assetPayload.name} has been updated.` });
     } else { 
-      addAsset(assetPayload);
+      addAsset(assetPayload); // addAsset is now synchronous and doesn't return the asset
       toast({ title: "Asset Added", description: `${assetPayload.name} has been added.` });
     }
     setIsFormOpen(false);
@@ -337,159 +339,154 @@ export default function AssetsPage() {
   const currentAssetLabels = assetLabelMap[currentAssetForForm?.category || 'stock'];
   const isTrackableCategoryInForm = currentAssetForForm?.category === 'stock' || currentAssetForForm?.category === 'crypto' || currentAssetForForm?.category === 'mutualfund';
 
-  const renderContentForTab = (tab: AssetCategory | 'overview') => {
-    if (tab === 'overview') {
-      return (
-        <motion.div
-          key="overview-content"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 20 }}
-          transition={{ duration: 0.25 }}
-        >
-        <Card className="rounded-2xl shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 p-4 sm:p-6">
-              <CardTitle className="text-base sm:text-lg md:text-xl">Portfolio Snapshot</CardTitle>
-              <Coins className="h-5 w-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0">
-              {Object.keys(portfolioTotalsByCurrency).length === 0 && <p className="text-muted-foreground text-sm">No assets to display totals for. Add some assets to get started.</p>}
-              {Object.entries(portfolioTotalsByCurrency).map(([currency, totalData]) => {
-                  const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
+  const renderOverviewContent = () => (
+    <motion.div
+      key="overview-content"
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={{ duration: 0.25 }}
+    >
+      <Card className="rounded-2xl shadow-lg">
+        <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-4 md:p-6">
+            <CardTitle className="text-md sm:text-lg md:text-xl">Portfolio Snapshot</CardTitle>
+            <Coins className="h-5 w-5 text-muted-foreground" />
+        </CardHeader>
+        <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+            {Object.keys(portfolioTotalsByCurrency).length === 0 && <p className="text-muted-foreground text-sm">No assets to display totals for. Add some assets to get started.</p>}
+            {Object.entries(portfolioTotalsByCurrency).map(([currency, totalData]) => {
+                 const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
                       ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100
                       : (totalData.allTimeGain !== 0 ? Infinity : 0); 
-                  return (
-                      <div key={currency} className="mb-3">
-                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
-                          <span className="text-xs sm:text-sm text-muted-foreground ml-1">({currency} Total Portfolio)</span>
-                      </p>
-                      {(totalData.allTimeGain !== 0) && (
-                          <div className="text-sm flex items-center mt-1">
-                          <span className="text-muted-foreground mr-1 text-xs sm:text-sm">All-Time Gain/Loss:</span>
-                          <span className={`text-xs sm:text-sm ${totalData.allTimeGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {totalData.allTimeGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <AlertTriangle className="inline h-4 w-4 mr-1" />}
-                              {totalData.allTimeGain >= 0 ? '+' : ''}{formatCurrency(totalData.allTimeGain, currency)}
-                              {(!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent))
-                              ? ` (${allTimeGainLossPercent.toFixed(2)}%)`
-                              : (totalData.totalPurchaseCost === 0 && totalData.allTimeGain !== 0 ? ` (N/A %)` : ` (0.00%)`)}
-                          </span>
-                          </div>
-                      )}
-                      </div>
-                  );
-              })}
-          </CardContent>
-          {allAssets.length === 0 && (
-              <CardContent className="pt-0 p-4 sm:p-6">
-                  <div className="text-center text-muted-foreground py-4">
-                      <WalletCards className="mx-auto h-12 w-12 mb-4 text-primary" />
-                      <p className="text-lg font-semibold">No assets yet!</p>
-                      <p className="text-sm">Click "Add Asset" above to start building your portfolio.</p>
-                  </div>
-              </CardContent>
-          )}
-        </Card>
-        </motion.div>
-      );
-    } else { 
-      const category = tab as AssetCategory;
-      const assetsForThisCategory = displayedAssets.filter(asset => asset.category === category);
-      return (
-         <motion.div
-            key={`${category}-content`}
-            initial={{ opacity: 0, x: activeTab === 'overview' ? 20 : -20 }} 
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: activeTab === 'overview' ? -20 : 20 }}
-            transition={{ duration: 0.25 }}
-            className="space-y-4"
-          >
-          <Card className="rounded-2xl shadow-lg mb-4 sm:mb-6">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-4 sm:p-6">
-            <CardTitle className="text-base sm:text-lg md:text-xl">{categoryDisplayNames[category]} Summary</CardTitle>
-            {assetIcons[category] ? React.cloneElement(assetIcons[category] as React.ReactElement) : <Coins className="h-5 w-5 text-muted-foreground" />}
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0">
-            {Object.keys(categorySpecificTotals).length === 0 && assetsForThisCategory.length === 0 && <p className="text-muted-foreground text-sm">No assets in this category. Add one using the "Add Asset" button.</p>}
-            {Object.entries(categorySpecificTotals).map(([currency, totalData]) => {
-                const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
-                    ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100
-                    : (totalData.allTimeGain !== 0 ? Infinity : 0);
-                const isTrackableCategoryForTab = category === 'stock' || category === 'crypto' || category === 'mutualfund';
-                
-                const assetsInThisCurrencyAndCategory = allAssets.filter(a => a.category === category && a.currency === currency);
-                if (assetsInThisCurrencyAndCategory.length === 0 && totalData.marketValue === 0) { 
-                    return null;
-                }
-                
                 return (
                     <div key={currency} className="mb-3">
                     <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
-                        <span className="text-xs sm:text-sm text-muted-foreground ml-1">({currency} Total {categoryDisplayNames[category].toLowerCase()})</span>
+                        <span className="text-xs sm:text-sm text-muted-foreground ml-1">({currency} Total Portfolio)</span>
                     </p>
-                    {isTrackableCategoryForTab && (totalData.allTimeGain !== 0) && (
+                     {(totalData.allTimeGain !== 0) && (
                         <div className="text-sm flex items-center mt-1">
                         <span className="text-muted-foreground mr-1 text-xs sm:text-sm">All-Time Gain/Loss:</span>
                         <span className={`text-xs sm:text-sm ${totalData.allTimeGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                             {totalData.allTimeGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <AlertTriangle className="inline h-4 w-4 mr-1" />}
                             {totalData.allTimeGain >= 0 ? '+' : ''}{formatCurrency(totalData.allTimeGain, currency)}
-                            {(!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent))
-                            ? ` (${allTimeGainLossPercent.toFixed(2)}%)`
-                            : (totalData.totalPurchaseCost === 0 && totalData.allTimeGain !== 0 ? ` (N/A %)` : ` (0.00%)`)}
+                             {(!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent))
+                              ? ` (${allTimeGainLossPercent.toFixed(2)}%)`
+                              : (totalData.totalPurchaseCost === 0 && totalData.allTimeGain !== 0 ? ` (N/A %)` : ` (0.00%)`)}
                         </span>
                         </div>
                     )}
                     </div>
                 );
             })}
-            {assetsForThisCategory.length === 0 && (
-                <p className="text-muted-foreground text-sm">No assets in this category yet. Add one using the button above.</p>
-            )}
+        </CardContent>
+        {allAssets.length === 0 && (
+            <CardContent className="pt-0 p-3 sm:p-4 md:p-6">
+                <div className="text-center text-muted-foreground py-4">
+                    <WalletCards className="mx-auto h-10 w-10 sm:h-12 sm:w-12 mb-4 text-primary" />
+                    <p className="text-md sm:text-lg font-semibold">No assets yet!</p>
+                    <p className="text-xs sm:text-sm">Use the "Add Asset" button to start building your portfolio.</p>
+                </div>
             </CardContent>
-          </Card>
+        )}
+      </Card>
+    </motion.div>
+  );
 
+  const renderCategoryContent = (category: AssetCategory) => {
+    const assetsForThisCategory = displayedAssets.filter(asset => asset.category === category);
+    return (
+       <motion.div
+          key={`${category}-content`}
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 20 }}
+          transition={{ duration: 0.25 }}
+          className="space-y-4"
+        >
+        <Card className="rounded-2xl shadow-lg mb-4">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 sm:p-4 md:p-6">
+          <CardTitle className="text-md sm:text-lg md:text-xl">{categoryDisplayNames[category]} Summary</CardTitle>
+          {assetIcons[category] ? React.cloneElement(assetIcons[category] as React.ReactElement, { className: "h-5 w-5 text-muted-foreground" }) : <Coins className="h-5 w-5 text-muted-foreground" />}
+          </CardHeader>
+          <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+          {Object.keys(categorySpecificTotals).length === 0 && assetsForThisCategory.length === 0 && <p className="text-muted-foreground text-sm">No assets in this category. Add one using the "Add Asset" button.</p>}
+          {Object.entries(categorySpecificTotals).map(([currency, totalData]) => {
+              const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
+                  ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100
+                  : (totalData.allTimeGain !== 0 ? Infinity : 0);
+              const isTrackableCategoryForTab = category === 'stock' || category === 'crypto' || category === 'mutualfund';
+              
+              const assetsInThisCurrencyAndCategory = allAssets.filter(a => a.category === category && a.currency === currency);
+              if (assetsInThisCurrencyAndCategory.length === 0 && totalData.marketValue === 0) { 
+                  return null;
+              }
+              
+              return (
+                  <div key={currency} className="mb-3">
+                  <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
+                      <span className="text-xs sm:text-sm text-muted-foreground ml-1">({currency} Total {categoryDisplayNames[category].toLowerCase()})</span>
+                  </p>
+                  {isTrackableCategoryForTab && (totalData.allTimeGain !== 0) && (
+                      <div className="text-sm flex items-center mt-1">
+                      <span className="text-muted-foreground mr-1 text-xs sm:text-sm">All-Time Gain/Loss:</span>
+                      <span className={`text-xs sm:text-sm ${totalData.allTimeGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {totalData.allTimeGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <AlertTriangle className="inline h-4 w-4 mr-1" />}
+                          {totalData.allTimeGain >= 0 ? '+' : ''}{formatCurrency(totalData.allTimeGain, currency)}
+                          {(!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent))
+                          ? ` (${allTimeGainLossPercent.toFixed(2)}%)`
+                          : (totalData.totalPurchaseCost === 0 && totalData.allTimeGain !== 0 ? ` (N/A %)` : ` (0.00%)`)}
+                      </span>
+                      </div>
+                  )}
+                  </div>
+              );
+          })}
           {assetsForThisCategory.length === 0 && (
-              <Card className="rounded-2xl shadow-lg">
-                  <CardContent className="pt-6 text-center text-muted-foreground p-4 sm:p-6">
-                      {assetIcons[category] ? React.cloneElement(assetIcons[category] as React.ReactElement, { className: "mx-auto h-12 w-12 mb-4 text-primary" }) : <WalletCards className="mx-auto h-12 w-12 mb-4 text-primary" />}
-                      <p className="text-lg font-semibold">No {categoryDisplayNames[category].toLowerCase()} added yet!</p>
-                      <p className="text-sm">Use the "Add Asset" button above to track your {categoryDisplayNames[category].toLowerCase()}.</p>
-                  </CardContent>
-              </Card>
+              <p className="text-muted-foreground text-sm">No assets in this category yet. Add one using the button above.</p>
           )}
+          </CardContent>
+        </Card>
 
-          <div className="grid gap-4 md:gap-6 grid-cols-1">
-              {assetsForThisCategory.map((asset) => (
-                <motion.div
-                    key={asset.id}
-                    className="h-full"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                  <AssetCardComponent asset={asset} onEdit={openForm} onDelete={handleDeleteAsset} />
-                </motion.div>
-              ))}
+        {assetsForThisCategory.length === 0 && (
+            <Card className="rounded-2xl shadow-lg">
+                <CardContent className="pt-6 text-center text-muted-foreground p-3 sm:p-4 md:p-6">
+                    {assetIcons[category] ? React.cloneElement(assetIcons[category] as React.ReactElement, { className: "mx-auto h-10 w-10 sm:h-12 sm:w-12 mb-4 text-primary" }) : <WalletCards className="mx-auto h-12 w-12 mb-4 text-primary" />}
+                    <p className="text-md sm:text-lg font-semibold">No {categoryDisplayNames[category].toLowerCase()} added yet!</p>
+                    <p className="text-xs sm:text-sm">Use the "Add Asset" button above to track your {categoryDisplayNames[category].toLowerCase()}.</p>
+                </CardContent>
+            </Card>
+        )}
+
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-1"> {/* Always single column for filtered view */}
+            {assetsForThisCategory.map((asset) => (
+              <motion.div
+                  key={asset.id}
+                  className="h-full"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.2 }}
+                >
+                <AssetCardComponent asset={asset} onEdit={openForm} onDelete={handleDeleteAsset} />
+              </motion.div>
+            ))}
+        </div>
+        {assetsForThisCategory.length > 0 && (
+          <div className="mt-4 text-xs text-muted-foreground">
+            <Info className="inline h-3 w-3 mr-1" />
+            Prices are manually entered by the user.
           </div>
-          {assetsForThisCategory.length > 0 && (
-            <div className="mt-4 text-xs text-muted-foreground">
-              <Info className="inline h-3 w-3 mr-1" />
-              All prices are manually entered by the user. All-time gain/loss is calculated based on purchase price and current price.
-            </div>
-          )}
-        </motion.div>
-      );
-    }
+        )}
+      </motion.div>
+    );
   };
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 md:gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
-            {activeTab === 'overview' ? 'Asset Portfolio Overview' : `${categoryDisplayNames[activeTab]} Assets`}
-          </h1>
-          <p className="text-muted-foreground text-sm sm:text-base">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Asset Portfolio</h1>
+          <p className="text-muted-foreground text-xs sm:text-sm">
             {activeTab === 'overview' ? 'Your financial asset overview.' : `Manage your ${categoryDisplayNames[activeTab].toLowerCase()}.`}
           </p>
         </div>
@@ -500,25 +497,25 @@ export default function AssetsPage() {
             }
         }}>
         <DialogTrigger asChild>
-            <Button onClick={() => openForm()} className="w-full md:w-auto mt-2 md:mt-0">
+            <Button onClick={() => openForm()} className="w-full sm:w-auto text-xs sm:text-sm">
             <PlusCircle className="mr-2 h-4 w-4" /> Add Asset
             </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[480px]">
             <DialogHeader>
-            <DialogTitle>{currentAssetForForm?.id ? 'Edit Asset' : `Add New ${activeTab && activeTab !== 'overview' ? categoryDisplayNames[activeTab as AssetCategory].slice(0,-1) : 'Asset'}`}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">{currentAssetForForm?.id ? 'Edit Asset' : `Add New ${activeTab !== 'overview' ? categoryDisplayNames[activeTab as AssetCategory].slice(0,-1) : 'Asset'}`}</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
                 Enter the details for your asset. Click "Save Asset" when done.
             </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-3 sm:gap-4 py-4">
-              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 sm:gap-x-4 gap-y-2">
+            <div className="grid gap-3 py-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 gap-y-2">
                   <Label htmlFor="name" className="text-left sm:text-right text-xs sm:text-sm">{currentAssetLabels.name}</Label>
                   <Input
                       id="name"
                       value={currentAssetForForm?.name || ''}
                       onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, name: e.target.value }))}
-                      className="col-span-1 sm:col-span-3 text-sm"
+                      className="col-span-1 sm:col-span-3 text-sm h-9 sm:h-10"
                       placeholder={
                           currentAssetForForm?.category === 'stock' ? 'e.g., Apple Inc.' :
                           currentAssetForForm?.category === 'crypto' ? 'e.g., Bitcoin' :
@@ -530,13 +527,13 @@ export default function AssetsPage() {
               </div>
 
             {isTrackableCategoryInForm && (
-                <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 sm:gap-x-4 gap-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 gap-y-2">
                      <Label htmlFor="tickerSymbol" className="text-left sm:text-right text-xs sm:text-sm">{currentAssetLabels.tickerSymbol}</Label>
                     <Input
                         id="tickerSymbol"
                         value={currentAssetForForm?.tickerSymbol || ''}
                         onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, tickerSymbol: e.target.value.toUpperCase() }))}
-                        className="col-span-1 sm:col-span-3 text-sm"
+                        className="col-span-1 sm:col-span-3 text-sm h-9 sm:h-10"
                          placeholder={
                             currentAssetForForm?.category === 'stock' ? 'e.g., AAPL' :
                             currentAssetForForm?.category === 'crypto' ? 'e.g., BTC' :
@@ -547,10 +544,10 @@ export default function AssetsPage() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 sm:gap-x-4 gap-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 gap-y-2">
                 <Label htmlFor="category" className="text-left sm:text-right text-xs sm:text-sm">Category</Label>
                 <Select value={currentAssetForForm?.category || 'stock'} onValueChange={handleCategoryChangeInForm}>
-                <SelectTrigger className="col-span-1 sm:col-span-3 text-sm">
+                <SelectTrigger className="col-span-1 sm:col-span-3 text-sm h-9 sm:h-10">
                     <SelectValue placeholder="Select asset category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -558,10 +555,10 @@ export default function AssetsPage() {
                 </SelectContent>
                 </Select>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 sm:gap-x-4 gap-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 gap-y-2">
                 <Label htmlFor="currency" className="text-left sm:text-right text-xs sm:text-sm">Currency</Label>
                 <Select value={currentAssetForForm?.currency || 'USD'} onValueChange={(value) => setCurrentAssetForForm(prev => ({ ...prev, currency: value }))}>
-                <SelectTrigger className="col-span-1 sm:col-span-3 text-sm">
+                <SelectTrigger className="col-span-1 sm:col-span-3 text-sm h-9 sm:h-10">
                     <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
@@ -569,24 +566,27 @@ export default function AssetsPage() {
                 </SelectContent>
                 </Select>
             </div>
+            <p className="text-xs text-muted-foreground col-span-1 sm:col-span-4 sm:text-right">
+              Global currency and auto-conversion is a planned feature.
+            </p>
 
             {(currentAssetForForm?.category !== 'bank' && currentAssetForForm?.category !== 'property') && (
-                <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 sm:gap-x-4 gap-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 gap-y-2">
                     <Label htmlFor="quantity" className="text-left sm:text-right text-xs sm:text-sm">{currentAssetLabels.quantity}</Label>
-                    <Input id="quantity" type="number" value={currentAssetForForm?.quantity === undefined ? '' : currentAssetForForm.quantity} onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 0 }))} className="col-span-1 sm:col-span-3 text-sm" placeholder={currentAssetForForm?.category === 'stock' ? 'e.g. 10' : currentAssetForForm?.category === 'crypto' ? 'e.g. 0.5' : 'e.g. 100'}/>
+                    <Input id="quantity" type="number" value={currentAssetForForm?.quantity === undefined ? '' : currentAssetForForm.quantity} onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 0 }))} className="col-span-1 sm:col-span-3 text-sm h-9 sm:h-10" placeholder={currentAssetForForm?.category === 'stock' ? 'e.g. 10' : currentAssetForForm?.category === 'crypto' ? 'e.g. 0.5' : 'e.g. 100'}/>
                 </div>
             )}
 
             {isTrackableCategoryInForm && (
-                <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 sm:gap-x-4 gap-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 gap-y-2">
                     <Label htmlFor="purchasePrice" className="text-left sm:text-right text-xs sm:text-sm">{currentAssetLabels.purchasePrice}</Label>
-                    <Input id="purchasePrice" type="number" value={currentAssetForForm?.purchasePrice === undefined ? '' : currentAssetForForm.purchasePrice} onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, purchasePrice: parseFloat(e.target.value) || 0 }))} className="col-span-1 sm:col-span-3 text-sm" placeholder="Price per unit at purchase" />
+                    <Input id="purchasePrice" type="number" value={currentAssetForForm?.purchasePrice === undefined ? '' : currentAssetForForm.purchasePrice} onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, purchasePrice: parseFloat(e.target.value) || 0 }))} className="col-span-1 sm:col-span-3 text-sm h-9 sm:h-10" placeholder="Price per unit at purchase" />
                 </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 sm:gap-x-4 gap-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 gap-y-2">
                 <Label htmlFor="currentPrice" className="text-left sm:text-right text-xs sm:text-sm">{currentAssetLabels.currentPrice}</Label>
-                <Input id="currentPrice" type="number" value={currentAssetForForm?.currentPrice === undefined ? '' : currentAssetForForm.currentPrice} onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, currentPrice: parseFloat(e.target.value) || 0 }))} className="col-span-1 sm:col-span-3 text-sm" placeholder="Manually enter current price/value" />
+                <Input id="currentPrice" type="number" value={currentAssetForForm?.currentPrice === undefined ? '' : currentAssetForForm.currentPrice} onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, currentPrice: parseFloat(e.target.value) || 0 }))} className="col-span-1 sm:col-span-3 text-sm h-9 sm:h-10" placeholder="Manually enter current price/value" />
             </div>
 
             </div>
@@ -594,32 +594,40 @@ export default function AssetsPage() {
             <Button type="button" variant="outline" onClick={() => {
                 setIsFormOpen(false);
                 setCurrentAssetForForm(initialAssetFormState);
-            }}>Cancel</Button>
-            <Button type="submit" onClick={handleSaveAsset}>Save Asset</Button>
+            }} className="text-xs sm:text-sm">Cancel</Button>
+            <Button type="submit" onClick={handleSaveAsset} className="text-xs sm:text-sm">Save Asset</Button>
             </DialogFooter>
         </DialogContent>
         </Dialog>
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 xs:grid-cols-3 sm:grid-cols-6 mb-4 overflow-x-auto pb-1 sm:pb-0">
-            <TabsTrigger value="overview">{categoryDisplayNames['overview']}</TabsTrigger>
+        <TabsList className="flex flex-wrap h-auto w-full justify-start items-center gap-1 mb-4">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm">{categoryDisplayNames['overview']}</TabsTrigger>
             {orderedAssetCategories.map(cat => (
-                <TabsTrigger key={cat} value={cat}>{categoryDisplayNames[cat]}</TabsTrigger>
+                <TabsTrigger key={cat} value={cat} className="text-xs sm:text-sm">{categoryDisplayNames[cat]}</TabsTrigger>
             ))}
         </TabsList>
         
         <div className="relative mt-2"> 
-            {activeTab !== 'overview' && (
-                <Button variant="outline" size="sm" onClick={() => handleTabChange('overview')} className="mb-4">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Overview
-                </Button>
-            )}
             <AnimatePresence mode="wait">
-              <TabsContent key={activeTab} value={activeTab} forceMount={true} className="w-full">
-                  {renderContentForTab(activeTab)}
-              </TabsContent>
+              {activeTab === 'overview' && isMounted && (
+                <TabsContent key="overview" value="overview" forceMount={true} className="w-full">
+                  {renderOverviewContent()}
+                </TabsContent>
+              )}
+              {activeTab !== 'overview' && isMounted && (
+                 <TabsContent key={activeTab} value={activeTab} forceMount={true} className="w-full">
+                    {activeTab !== 'overview' && (
+                      <Button variant="outline" size="sm" onClick={() => handleTabChange('overview')} className="mb-4 text-xs sm:text-sm">
+                          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Overview
+                      </Button>
+                    )}
+                    {renderCategoryContent(activeTab as AssetCategory)}
+                 </TabsContent>
+              )}
             </AnimatePresence>
+             {!isMounted && <p className="text-center text-muted-foreground">Loading assets...</p>}
         </div>
       </Tabs>
     </div>
