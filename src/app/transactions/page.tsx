@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useTransactions, type Transaction } from '@/contexts/TransactionContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
+// Helper to generate a somewhat unique ID on the client
+const generateClientUniqueId = () => Math.random().toString(36).substring(2, 11);
 
 interface FormTransaction {
   id: string; // For form row key
@@ -24,7 +26,7 @@ interface FormTransaction {
   category: string;
 }
 
-const initialFormTransactionRow: Omit<FormTransaction, 'id'> = {
+const initialTransactionRowData: Omit<FormTransaction, 'id'> = {
   date: new Date().toISOString().split('T')[0],
   description: '',
   amount: '',
@@ -45,9 +47,15 @@ export default function TransactionsPage() {
   const { toast } = useToast();
   const { transactions: savedTransactions, addTransactionBatch, deleteTransaction, updateTransaction } = useTransactions();
   
-  const [formTransactions, setFormTransactions] = useState<FormTransaction[]>([
-    { ...initialFormTransactionRow, id: Date.now().toString() },
-  ]);
+  const [formTransactions, setFormTransactions] = useState<FormTransaction[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    // Initialize with one row after mounting
+    setFormTransactions([{ ...initialTransactionRowData, id: generateClientUniqueId() }]);
+  }, []);
+
 
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [currentTransactionForEdit, setCurrentTransactionForEdit] = useState<Transaction>(initialEditFormState);
@@ -74,7 +82,7 @@ export default function TransactionsPage() {
   const addTransactionRow = () => {
     setFormTransactions([
       ...formTransactions,
-      { ...initialFormTransactionRow, id: (Date.now() + formTransactions.length).toString() },
+      { ...initialTransactionRowData, id: generateClientUniqueId() },
     ]);
   };
 
@@ -136,7 +144,7 @@ export default function TransactionsPage() {
       title: "Transactions Saved",
       description: `${validTransactionsToSave.length} transaction(s) have been saved successfully.`,
     });
-    setFormTransactions([{ ...initialFormTransactionRow, id: Date.now().toString() }]);
+    setFormTransactions([{ ...initialTransactionRowData, id: generateClientUniqueId() }]);
   };
 
   const openEditForm = (transaction: Transaction) => {
@@ -207,7 +215,8 @@ export default function TransactionsPage() {
           <CardDescription>Enter details for multiple transactions below.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {formTransactions.map((tx) => (
+          {!isMounted && <p className="text-muted-foreground">Loading form...</p>}
+          {isMounted && formTransactions.map((tx) => (
             <div key={tx.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-4 border rounded-lg shadow-sm bg-card">
               <div className="md:col-span-2">
                 <Label htmlFor={`date-${tx.id}`}>Date</Label>
@@ -279,12 +288,14 @@ export default function TransactionsPage() {
               </div>
             </div>
           ))}
-          <Button variant="outline" onClick={addTransactionRow} className="mt-4 w-full md:w-auto">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Another Transaction Row
-          </Button>
+          {isMounted && (
+            <Button variant="outline" onClick={addTransactionRow} className="mt-4 w-full md:w-auto">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Another Transaction Row
+            </Button>
+          )}
         </CardContent>
         <CardFooter>
-          <Button onClick={handleSaveAllBatch} className="w-full md:w-auto">
+          <Button onClick={handleSaveAllBatch} className="w-full md:w-auto" disabled={!isMounted || formTransactions.length === 0}>
             <Save className="mr-2 h-4 w-4" /> Save Entered Transactions
           </Button>
         </CardFooter>
@@ -419,4 +430,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
