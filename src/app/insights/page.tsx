@@ -3,9 +3,8 @@
 
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+// Input and Label removed as they are no longer used for health score
 import { Lightbulb, Loader2, AlertTriangle, Info, TrendingUp, TrendingDown, ShieldCheck, Sparkles } from 'lucide-react';
 import { getSavingsOpportunities, type GetSavingsOpportunitiesOutput } from '@/ai/flows/savings-opportunities';
 import { getFinancialHealthScore, type FinancialHealthScoreOutput, type FinancialHealthScoreInput } from '@/ai/flows/financial-health-score';
@@ -13,25 +12,26 @@ import { useToast } from "@/hooks/use-toast";
 import Image from 'next/image';
 import { useAssets, type Asset as ContextAsset } from '@/contexts/AssetContext';
 import { useDebts, type Debt as ContextDebt } from '@/contexts/DebtContext';
+import { useTransactions, type Transaction } from '@/contexts/TransactionContext'; // Import useTransactions
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
+import { format, parseISO, startOfMonth, subMonths, isSameMonth } from 'date-fns';
 
 export default function AiInsightsPage() {
   const { toast } = useToast();
   const { assets } = useAssets();
   const { debts } = useDebts();
+  const { transactions } = useTransactions(); // Get transactions
 
   const [opportunities, setOpportunities] = useState<GetSavingsOpportunitiesOutput['opportunities'] | null>(null);
   const [isLoadingOpportunities, setIsLoadingOpportunities] = useState(false);
   const [opportunitiesError, setOpportunitiesError] = useState<string | null>(null);
 
-  const [healthScoreInput, setHealthScoreInput] = useState<Partial<FinancialHealthScoreInput>>({
-    averageMonthlyIncome: undefined,
-    averageMonthlyExpenses: undefined,
-  });
+  // Health Score Input state is no longer needed for manual entry
   const [healthScoreResult, setHealthScoreResult] = useState<FinancialHealthScoreOutput | null>(null);
   const [isLoadingHealthScore, setIsLoadingHealthScore] = useState(false);
   const [healthScoreError, setHealthScoreError] = useState<string | null>(null);
+  const [healthScoreCalculationInfo, setHealthScoreCalculationInfo] = useState<string | null>(null);
 
 
   const formatAssetSummary = (currentAssets: ContextAsset[]): string => {
@@ -40,13 +40,12 @@ export default function AiInsightsPage() {
     }
     return currentAssets
       .map(asset => {
-        const marketValue = (asset.category === 'bank' || asset.category === 'property')
-          ? asset.currentPrice
-          : asset.currentPrice * (asset.quantity || 0);
-
-        let detail = `${asset.name}: ${asset.currency} ${marketValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} (Category: ${asset.category}`;
+        let detail = `${asset.name}: ${asset.currency} ${asset.currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} (Category: ${asset.category}`;
         if (asset.tickerSymbol) {
           detail += `, Ticker: ${asset.tickerSymbol}`;
+        }
+         if (asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund') {
+          detail += `, Quantity: ${asset.quantity}`;
         }
         detail += ')';
         return detail;
@@ -128,21 +127,83 @@ export default function AiInsightsPage() {
     }
   };
 
-  const handleGetHealthScore = async () => {
-    if (!healthScoreInput.averageMonthlyIncome || healthScoreInput.averageMonthlyIncome <=0 || healthScoreInput.averageMonthlyExpenses === undefined || healthScoreInput.averageMonthlyExpenses < 0) {
-        toast({ title: "Input Required", description: "Please enter valid average monthly income and expenses.", variant: "destructive" });
-        return;
-    }
-    if (!assets || assets.length === 0) {
-      toast({ title: "No Assets Found", description: "Please add some assets on the Assets page first to calculate a health score.", variant: "default" });
-      setHealthScoreError("No assets available to analyze. Please add assets on the Assets page.");
-      setHealthScoreResult(null);
-      return;
+  const calculateAverageMonthlyIncomeAndExpenses = (txs: Transaction[]): { averageIncome: number; averageExpenses: number; monthsConsidered: number } => {
+    if (!txs || txs.length === 0) {
+      return { averageIncome: 0, averageExpenses: 0, monthsConsidered: 0 };
     }
 
+    const monthlyData: Record<string, { income: number, expenses: number, monthYear: string }> = {};
+    const endDate = new Date();
+    const startDate = startOfMonth(subMonths(endDate, 5)); // Consider up to the last 6 months including current
+
+    txs.forEach(tx => {
+      const txDate = parseISO(tx.date);
+      if (txDate >= startDate && txDate <= endDate) { // Only consider transactions in the last 6 months
+        const monthYear = format(txDate, 'yyyy-MM');
+        if (!monthlyData[monthYear]) {
+          monthlyData[monthYear] = { income: 0, expenses: 0, monthYear };
+        }
+        if (tx.type === 'income') {
+          monthlyData[monthYear].income += tx.amount;
+        } else {
+          monthlyData[monthYear].expenses += tx.amount;
+        }
+      }
+    });
+    
+    const sortedMonthlyDataValues = Object.values(monthlyData).sort((a, b) => a.monthYear.localeCompare(b.monthYear));
+    
+    // Ensure we only consider full past months up to 6, or fewer if less data exists.
+    // For simplicity here, we will average over all unique months found in the last 6 calendar months.
+    
+    if (sortedMonthlyDataValues.length === 0) {
+        return { averageIncome: 0, averageExpenses: 0, monthsConsidered: 0 };
+    }
+
+    const totalIncome = sortedMonthlyDataValues.reduce((sum, data) => sum + data.income, 0);
+    const totalExpenses = sortedMonthlyDataValues.reduce((sum, data) => sum + data.expenses, 0);
+    const numMonths = sortedMonthlyDataValues.length;
+
+    return {
+      averageIncome: totalIncome / numMonths,
+      averageExpenses: totalExpenses / numMonths,
+      monthsConsidered: numMonths,
+    };
+  };
+
+
+  const handleGetHealthScore = async () => {
     setIsLoadingHealthScore(true);
     setHealthScoreError(null);
     setHealthScoreResult(null);
+    setHealthScoreCalculationInfo(null);
+
+    if (!assets || assets.length === 0) {
+      toast({ title: "No Assets Found", description: "Please add some assets on the Assets page first to calculate a health score.", variant: "default" });
+      setHealthScoreError("No assets available for health score. Please add assets on the Assets page.");
+      setIsLoadingHealthScore(false);
+      return;
+    }
+     if (!transactions || transactions.length === 0) {
+      toast({ title: "No Transactions Found", description: "Financial health score requires transaction data for income/expense averages. Please add transactions.", variant: "default" });
+      setHealthScoreError("No transaction data available for income/expense averages. Please add transactions.");
+      setIsLoadingHealthScore(false);
+      return;
+    }
+
+
+    const { averageIncome, averageExpenses, monthsConsidered } = calculateAverageMonthlyIncomeAndExpenses(transactions);
+    
+    let calcInfo = `Averages based on ${monthsConsidered} month(s) of transaction data.`;
+    if (monthsConsidered === 0) {
+        calcInfo = "Not enough transaction data (last 6 months) to calculate income/expense averages for score. Score may be less accurate.";
+        toast({ title: "Limited Data", description: calcInfo, variant: "default", duration: 7000});
+    } else if (monthsConsidered < 3) {
+        calcInfo = `Averages based on only ${monthsConsidered} month(s) of transaction data. Score might be less accurate with more data.`;
+        toast({ title: "Limited Data", description: calcInfo, variant: "default", duration: 7000 });
+    }
+    setHealthScoreCalculationInfo(calcInfo);
+
 
     const currentAssetSummary = formatAssetSummary(assets);
     const currentDebtSummary = formatDebtSummary(debts);
@@ -151,8 +212,8 @@ export default function AiInsightsPage() {
       const result = await getFinancialHealthScore({ 
         assetSummary: currentAssetSummary,
         debtSummary: currentDebtSummary,
-        averageMonthlyIncome: healthScoreInput.averageMonthlyIncome!,
-        averageMonthlyExpenses: healthScoreInput.averageMonthlyExpenses!,
+        averageMonthlyIncome: averageIncome, // Use calculated average
+        averageMonthlyExpenses: averageExpenses, // Use calculated average
        });
       if (result) {
         setHealthScoreResult(result);
@@ -184,10 +245,6 @@ export default function AiInsightsPage() {
     }
   };
 
-  const handleHealthScoreInputChange = (field: keyof FinancialHealthScoreInput, value: string) => {
-    setHealthScoreInput(prev => ({ ...prev, [field]: value === '' ? undefined : parseFloat(value) }));
-  };
-
   const getScoreColor = (score: number) => {
     if (score > 800) return 'bg-green-500';
     if (score > 600) return 'bg-yellow-500';
@@ -209,33 +266,12 @@ export default function AiInsightsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> Financial Health Score</CardTitle>
           <CardDescription>
-            Enter your average monthly income and expenses to get your AI-powered financial health score. Assets and debts are automatically included.
+            Your financial health score is calculated using your tracked assets, debts, and automatically derived average monthly income and expenses from your transaction history (last 6 months).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="avgIncome">Average Monthly Income (after tax)</Label>
-              <Input 
-                id="avgIncome" 
-                type="number" 
-                placeholder="e.g., 5000" 
-                value={healthScoreInput.averageMonthlyIncome || ''}
-                onChange={(e) => handleHealthScoreInputChange('averageMonthlyIncome', e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="avgExpenses">Average Monthly Expenses</Label>
-              <Input 
-                id="avgExpenses" 
-                type="number" 
-                placeholder="e.g., 3500" 
-                value={healthScoreInput.averageMonthlyExpenses || ''}
-                onChange={(e) => handleHealthScoreInputChange('averageMonthlyExpenses', e.target.value)}
-              />
-            </div>
-          </div>
-          <Button onClick={handleGetHealthScore} disabled={isLoadingHealthScore || !assets || assets.length === 0} className="w-full sm:w-auto">
+           {/* Removed Input fields for averageMonthlyIncome and averageMonthlyExpenses */}
+          <Button onClick={handleGetHealthScore} disabled={isLoadingHealthScore || !assets || assets.length === 0 || !transactions || transactions.length === 0} className="w-full sm:w-auto">
             {isLoadingHealthScore ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -243,6 +279,9 @@ export default function AiInsightsPage() {
             )}
             Calculate My Financial Health Score
           </Button>
+           {healthScoreCalculationInfo && !isLoadingHealthScore && (
+            <p className="text-xs text-muted-foreground pt-1"><Info className="inline h-3 w-3 mr-1"/>{healthScoreCalculationInfo}</p>
+          )}
         </CardContent>
         {healthScoreResult && !isLoadingHealthScore && (
           <CardFooter className="flex flex-col items-start gap-4 pt-4 border-t">
@@ -283,11 +322,15 @@ export default function AiInsightsPage() {
                 </div>
             </CardFooter>
         )}
-         {(!assets || assets.length === 0) && (
+         {((!assets || assets.length === 0) || (!transactions || transactions.length === 0)) && !isLoadingHealthScore && (
                 <CardFooter className="pt-4 border-t">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Info className="h-5 w-5 text-primary" />
-                        <span>No assets are currently being tracked. Please add assets to calculate health score.</span>
+                        <span>
+                            Financial health score calculation requires both asset data and transaction history.
+                            {!assets || assets.length === 0 ? " Please add assets." : ""}
+                            {!transactions || transactions.length === 0 ? " Please add transactions." : ""}
+                        </span>
                     </div>
                 </CardFooter>
             )}
