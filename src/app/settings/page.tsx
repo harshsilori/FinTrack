@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { UserCircle, Bell, Palette, ShieldCheck, Database, AlertTriangle } from "lucide-react";
+import { UserCircle, Bell, Palette, ShieldCheck, Database, AlertTriangle, UploadCloud, DownloadCloud } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { format } from 'date-fns';
 
 import { useAssets, type Asset } from '@/contexts/AssetContext';
 import { useTransactions, type Transaction } from '@/contexts/TransactionContext';
@@ -19,7 +20,7 @@ import { useGoals, type Goal } from '@/contexts/GoalContext';
 import { useBudgets, type Budget } from '@/contexts/BudgetContext';
 import { useDebts, type Debt } from '@/contexts/DebtContext';
 
-// Sample Data Definitions
+// Sample Data Definitions (remain for "Load Sample Data" functionality)
 const sampleAssetsData: Asset[] = [
   { id: 'sampleAsset1', name: 'Sample Savings', category: 'bank', currency: 'USD', quantity: 1, currentPrice: 15000, lastUpdated: '2024-07-01' },
   { id: 'sampleAsset2', name: 'Sample Tech Stock', category: 'stock', currency: 'USD', quantity: 50, purchasePrice: 100, currentPrice: 120, tickerSymbol: 'SMPL', lastUpdated: '2024-07-01' },
@@ -50,14 +51,15 @@ const sampleDebtsData: Debt[] = [
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  const { replaceAllAssets } = useAssets();
-  const { replaceAllTransactions } = useTransactions();
-  const { replaceAllGoals } = useGoals();
-  const { replaceAllBudgets } = useBudgets();
-  const { replaceAllDebts } = useDebts();
+  const { assets, replaceAllAssets } = useAssets();
+  const { transactions, replaceAllTransactions } = useTransactions();
+  const { goals, replaceAllGoals } = useGoals();
+  const { budgets, replaceAllBudgets } = useBudgets();
+  const { debts, replaceAllDebts } = useDebts();
 
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [accentTheme, setAccentTheme] = useState('theme-default');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const storedDarkMode = localStorage.getItem('darkMode') === 'true';
@@ -102,6 +104,103 @@ export default function SettingsPage() {
     });
   };
 
+  const handleBackupData = () => {
+    const backupData = {
+      assets,
+      transactions,
+      goals,
+      budgets,
+      debts,
+      backupDate: new Date().toISOString(),
+      appVersion: 'FinTrackMobile_v1.0_LocalBackup', // Example version
+    };
+
+    const jsonString = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = href;
+    const formattedDate = format(new Date(), 'yyyy-MM-dd_HH-mm-ss');
+    link.download = `fintrack_backup_${formattedDate}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(href);
+
+    toast({
+      title: "Data Backup Successful",
+      description: "Your data has been exported to a JSON file.",
+    });
+  };
+
+  const handleRestoreDataChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      toast({ title: "No file selected", variant: "destructive" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const result = e.target?.result;
+        if (typeof result !== 'string') {
+          toast({ title: "Error reading file", description: "File content is not valid text.", variant: "destructive" });
+          return;
+        }
+        const importedData = JSON.parse(result);
+
+        // Basic validation
+        if (
+          !importedData ||
+          typeof importedData !== 'object' ||
+          !Array.isArray(importedData.assets) ||
+          !Array.isArray(importedData.transactions) ||
+          !Array.isArray(importedData.goals) ||
+          !Array.isArray(importedData.budgets) ||
+          !Array.isArray(importedData.debts)
+        ) {
+          toast({ title: "Invalid Backup File", description: "The selected file is not a valid FinTrack backup.", variant: "destructive" });
+          return;
+        }
+        
+        // It's good practice to validate each item in the arrays against their respective types if possible,
+        // but for this prototype, we'll assume the structure is generally correct if the top-level arrays exist.
+
+        replaceAllAssets(importedData.assets as Asset[]);
+        replaceAllTransactions(importedData.transactions as Transaction[]);
+        replaceAllGoals(importedData.goals as Goal[]);
+        replaceAllBudgets(importedData.budgets as Budget[]);
+        replaceAllDebts(importedData.debts as Debt[]);
+
+        toast({
+          title: "Data Restored Successfully",
+          description: "Your data has been imported from the backup file.",
+        });
+
+      } catch (error) {
+        console.error("Error parsing or restoring backup:", error);
+        toast({ title: "Restore Failed", description: "Could not parse or restore the backup file. Make sure it's a valid FinTrack JSON backup.", variant: "destructive" });
+      } finally {
+         // Reset file input to allow selecting the same file again
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+      }
+    };
+    reader.onerror = () => {
+        toast({ title: "Error reading file", description: reader.error?.message, variant: "destructive" });
+         if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    };
+    reader.readAsText(file);
+  };
+
+  const triggerFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
 
   const themeOptions = [
     { value: 'theme-default', label: 'Default Blue', primary: 'hsl(231 48% 48%)', accent: 'hsl(261 44% 58%)' },
@@ -123,7 +222,7 @@ export default function SettingsPage() {
       <Card className="rounded-2xl shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><UserCircle className="h-5 w-5 text-primary"/> Profile Settings</CardTitle>
-          <CardDescription>Update your personal information.</CardDescription>
+          <CardDescription>Update your personal information. (Note: Password changes are handled through re-registration for local accounts)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
@@ -133,10 +232,13 @@ export default function SettingsPage() {
             </div>
             <div>
               <Label htmlFor="email">Email Address</Label>
-              <Input id="email" type="email" placeholder="your@email.com" defaultValue="demo@example.com" />
+              <Input id="email" type="email" placeholder="your@email.com" defaultValue="demo@example.com" disabled />
             </div>
           </div>
-          <Button>Save Profile</Button>
+          <Button disabled>Save Profile (Name Only)</Button>
+           <p className="text-xs text-muted-foreground">
+            Email is tied to your local account and cannot be changed here. To change your password, please sign out and re-register.
+          </p>
         </CardContent>
       </Card>
 
@@ -222,34 +324,47 @@ export default function SettingsPage() {
       
       <Card className="rounded-2xl shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary"/> Security</CardTitle>
-          <CardDescription>Manage your account security settings. (Functionality not implemented)</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="current-password">Current Password</Label>
-            <Input id="current-password" type="password" disabled/>
-          </div>
-          <div>
-            <Label htmlFor="new-password">New Password</Label>
-            <Input id="new-password" type="password" disabled/>
-          </div>
-          <div>
-            <Label htmlFor="confirm-password">Confirm New Password</Label>
-            <Input id="confirm-password" type="password" disabled/>
-          </div>
-          <Button disabled>Change Password</Button>
-        </CardContent>
-      </Card>
-
-      <Separator />
-
-       <Card className="rounded-2xl shadow-lg">
-        <CardHeader>
           <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-primary"/> Data Management</CardTitle>
-          <CardDescription>Manage your application data.</CardDescription>
+          <CardDescription>Manage your application data. Backups are stored locally as JSON files.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Button onClick={handleBackupData} variant="outline" className="w-full">
+                    <DownloadCloud className="mr-2 h-4 w-4" /> Backup All Data
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                     <Button variant="outline" className="w-full">
+                       <UploadCloud className="mr-2 h-4 w-4" /> Restore Data from Backup
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Restore Data from Backup?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action will overwrite ALL your current application data with the data from the selected backup file. This cannot be undone. Are you sure you want to proceed?
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={triggerFileSelect}>
+                        Choose File & Restore
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".json"
+                    onChange={handleRestoreDataChange}
+                    className="hidden"
+                />
+            </div>
+           <p className="text-xs text-muted-foreground">
+            Backup creates a JSON file of your data. Restore will replace all current data with the backup.
+          </p>
+           <Separator className="my-4"/>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" className="w-full sm:w-auto">

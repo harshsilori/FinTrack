@@ -5,25 +5,32 @@ import type { ReactNode } from 'react';
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
-// Simple pseudo-hashing for demonstration. NOT FOR PRODUCTION.
-const pseudoHashPassword = (password: string): string => {
-  try {
-    // A simple transformation. Replace with a real hashing library for production.
-    return `localProtoHash|${password.split('').reverse().join('')}|${password.length}`;
-  } catch (e) {
-    // Fallback for environments where btoa might not be ideal or available (though unlikely for modern browsers)
-    return `fallback|${password.split('').reverse().join('')}|${password.length}`;
-  }
-};
+// Helper function to convert ArrayBuffer to hex string
+async function arrayBufferToHex(buffer: ArrayBuffer): Promise<string> {
+  const byteArray = new Uint8Array(buffer);
+  const hexCodes = [...byteArray].map(value => {
+    const hexCode = value.toString(16);
+    const paddedHexCode = hexCode.padStart(2, '0');
+    return paddedHexCode;
+  });
+  return hexCodes.join('');
+}
 
-const USER_STORAGE_KEY = 'finTrackLocalUsers';
-const CURRENT_USER_SESSION_KEY = 'finTrackCurrentUserEmail';
+// Async function to hash password using SHA-256
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return arrayBufferToHex(hashBuffer);
+}
+
+
+const USER_STORAGE_KEY = 'finTrackLocalUsers_v2'; // Changed key due to new password format
+const CURRENT_USER_SESSION_KEY = 'finTrackCurrentUserEmail_v2';
 
 interface LocalUser {
   email: string;
-  // passwordHash: string; // Storing plain password for this simplified local prototype as hashing comparison is tricky without libraries.
-  // IN A REAL APP, NEVER STORE PLAIN PASSWORDS. HASH THEM.
-  password: string; // Storing plain password for simplicity in this prototype.
+  passwordHash: string; // Changed from plain password
 }
 
 interface CurrentUser {
@@ -64,7 +71,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    // Check for an existing session on mount
     try {
       const loggedInUserEmail = localStorage.getItem(CURRENT_USER_SESSION_KEY);
       if (loggedInUserEmail) {
@@ -73,7 +79,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (existingUser) {
           setCurrentUser({ email: loggedInUserEmail });
         } else {
-          // Clean up if session user doesn't exist in users list anymore
           localStorage.removeItem(CURRENT_USER_SESSION_KEY);
         }
       }
@@ -93,10 +98,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoadingAuthState(false);
       return null;
     }
+    if (pass.length < 6) {
+        toast({ title: "Sign Up Failed", description: "Password must be at least 6 characters long.", variant: "destructive" });
+        setLoadingAuthState(false);
+        return null;
+    }
 
-    // const passwordHash = pseudoHashPassword(pass); // In a real app, use this
-    // For prototype simplicity, storing plain password.
-    const newUser: LocalUser = { email: emailLowerCase, password: pass };
+    const newPasswordHash = await hashPassword(pass);
+    const newUser: LocalUser = { email: emailLowerCase, passwordHash: newPasswordHash };
     
     users.push(newUser);
     saveLocalUsers(users);
@@ -109,7 +118,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("Error setting current user in localStorage", error);
     }
     
-    toast({ title: "Sign Up Successful", description: "Welcome!" });
+    toast({ title: "Sign Up Successful", description: "Welcome! Your password has been securely stored. (Note: Old accounts require re-registration)" });
     setLoadingAuthState(false);
     return newCurrentUser;
   }, [toast]);
@@ -126,9 +135,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return null;
     }
 
-    // const inputPasswordHash = pseudoHashPassword(pass); // In a real app, compare hashes
-    // Comparing plain passwords for prototype.
-    if (user.password === pass) {
+    const inputPasswordHash = await hashPassword(pass);
+    if (user.passwordHash === inputPasswordHash) {
       const newCurrentUser = { email: user.email };
       setCurrentUser(newCurrentUser);
       try {
