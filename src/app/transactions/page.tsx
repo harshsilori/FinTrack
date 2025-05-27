@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -374,7 +374,7 @@ export default function TransactionsPage() {
                     <TableBody>
                         {savedTransactions.map((tx) => (
                             <TableRow key={tx.id}>
-                                <TableCell>{new Date(tx.date + 'T00:00:00').toLocaleDateString()}</TableCell> {/* Ensure date is parsed as local */}
+                                <TableCell>{new Date(tx.date + 'T00:00:00').toLocaleDateString()}</TableCell>
                                 <TableCell className="font-medium">{tx.description}</TableCell>
                                 <TableCell>{tx.category}</TableCell>
                                 <TableCell className={`capitalize ${tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -419,3 +419,4 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
