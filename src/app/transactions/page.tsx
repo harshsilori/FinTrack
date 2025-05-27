@@ -8,12 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'; // DialogTrigger removed for now, form is always visible
 import { PlusCircle, Trash2, Save, Upload, Camera, AlertTriangle, Edit3, FilterX, Search as SearchIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useTransactions, type Transaction } from '@/contexts/TransactionContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { parseISO, isWithinInterval, isValid } from 'date-fns';
+import { parseISO, isValid } from 'date-fns'; // isWithinInterval removed as date filtering logic will be adjusted
 
 const generateClientUniqueId = () => Math.random().toString(36).substring(2, 11);
 
@@ -51,6 +51,9 @@ const defaultFilterState = {
   searchTerm: '',
 };
 
+const appDefinedCategories = ['Groceries', 'Utilities', 'Salary', 'Entertainment', 'Transport', 'Healthcare', 'Education', 'Dining Out', 'Shopping', 'Rent/Mortgage', 'Investment', 'Gifts', 'Other'].sort();
+
+
 export default function TransactionsPage() {
   const { toast } = useToast();
   const { transactions: savedTransactions, addTransactionBatch, deleteTransaction, updateTransaction } = useTransactions();
@@ -60,6 +63,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     setIsMounted(true);
+    // Initialize with one row using client-side ID
     setFormTransactions([{ ...initialTransactionRowData, id: generateClientUniqueId() }]);
   }, []);
 
@@ -75,11 +79,9 @@ export default function TransactionsPage() {
   const [searchTerm, setSearchTerm] = useState(defaultFilterState.searchTerm);
 
   const availableCategories = useMemo(() => {
-    const allCats = savedTransactions.map(tx => tx.category);
+    const allCats = savedTransactions.map(tx => tx.category).concat(appDefinedCategories);
     return ['all', ...Array.from(new Set(allCats)).sort()];
-  }, [savedTransactions]);
-
-  const appDefinedCategories = useMemo(() => ['Groceries', 'Utilities', 'Salary', 'Entertainment', 'Transport', 'Healthcare', 'Education', 'Dining Out', 'Shopping', 'Rent/Mortgage', 'Investment', 'Gifts', 'Other'].sort(), []);
+  }, [savedTransactions, appDefinedCategories]);
 
 
   const handleInputChange = (id: string, field: keyof Omit<FormTransaction, 'id' | 'type' | 'category'>, value: string) => {
@@ -93,7 +95,7 @@ export default function TransactionsPage() {
   const handleTypeChange = (id: string, value: 'income' | 'expense') => {
     setFormTransactions(
       formTransactions.map((tx) =>
-        tx.id === id ? { ...tx, type: value, category: '' } : tx // Reset category on type change if needed
+        tx.id === id ? { ...tx, type: value, category: tx.category || appDefinedCategories[0] } : tx 
       )
     );
   };
@@ -109,7 +111,7 @@ export default function TransactionsPage() {
   const addTransactionRow = () => {
     setFormTransactions([
       ...formTransactions,
-      { ...initialTransactionRowData, id: generateClientUniqueId() },
+      { ...initialTransactionRowData, id: generateClientUniqueId(), category: appDefinedCategories[0] },
     ]);
   };
 
@@ -171,7 +173,7 @@ export default function TransactionsPage() {
       title: "Transactions Saved",
       description: `${validTransactionsToSave.length} transaction(s) have been saved successfully.`,
     });
-    setFormTransactions([{ ...initialTransactionRowData, id: generateClientUniqueId() }]);
+    setFormTransactions([{ ...initialTransactionRowData, id: generateClientUniqueId(), category: appDefinedCategories[0] }]);
   };
 
   const openEditForm = (transaction: Transaction) => {
@@ -183,6 +185,7 @@ export default function TransactionsPage() {
     setCurrentTransactionForEdit(prev => ({
         ...prev!,
         [field]: value,
+        ...(field === 'type' && {category: prev!.category || appDefinedCategories[0]}) // Reset category if type changes
     }));
   };
   
@@ -226,14 +229,22 @@ export default function TransactionsPage() {
     return savedTransactions.filter(tx => {
       const txDate = parseISO(tx.date);
       
-      const isAfterStartDate = filterStartDate ? txDate >= parseISO(filterStartDate) : true;
-      const isBeforeEndDate = filterEndDate ? txDate <= parseISO(filterEndDate) : true;
+      let isAfterStartDate = true;
+      if (filterStartDate && isValid(parseISO(filterStartDate))) {
+        isAfterStartDate = txDate >= parseISO(filterStartDate);
+      }
+      
+      let isBeforeEndDate = true;
+      if (filterEndDate && isValid(parseISO(filterEndDate))) {
+        isBeforeEndDate = txDate <= parseISO(filterEndDate);
+      }
+      
       const matchesType = filterType === 'all' || tx.type === filterType;
       const matchesCategory = filterCategory === 'all' || tx.category === filterCategory;
       const matchesSearchTerm = searchTerm === '' || tx.description.toLowerCase().includes(searchTerm.toLowerCase());
 
       return isAfterStartDate && isBeforeEndDate && matchesType && matchesCategory && matchesSearchTerm;
-    });
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [savedTransactions, filterStartDate, filterEndDate, filterType, filterCategory, searchTerm]);
 
   const clearFilters = () => {
@@ -249,16 +260,16 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-            <h1 className="text-3xl font-bold tracking-tight">Transaction Management</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Transaction Management</h1>
             <p className="text-muted-foreground">
-            Add new transactions, import statements, or manage your existing entries.
+            Add new transactions or manage your existing entries.
             </p>
         </div>
-        <div className="flex gap-2">
-            <Button variant="outline" onClick={() => handleImportPlaceholder("Bank Statement Import (PDF/CSV)")}>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => handleImportPlaceholder("Bank Statement Import (PDF/CSV)")} className="w-full sm:w-auto">
                 <Upload className="mr-2 h-4 w-4" /> Import Statement
             </Button>
-            <Button variant="outline" onClick={() => handleImportPlaceholder("Bill Scanner (Image OCR)")}>
+            <Button variant="outline" onClick={() => handleImportPlaceholder("Bill Scanner (Image OCR)")} className="w-full sm:w-auto">
                 <Camera className="mr-2 h-4 w-4" /> Scan Bill
             </Button>
         </div>
@@ -272,7 +283,7 @@ export default function TransactionsPage() {
         <CardContent className="space-y-4">
           {!isMounted && <p className="text-muted-foreground text-center py-4">Loading transaction entry form...</p>}
           {isMounted && formTransactions.map((tx) => (
-            <div key={tx.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-4 border rounded-lg shadow-sm bg-card">
+            <div key={tx.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-3 md:p-4 border rounded-lg shadow-sm bg-card">
               <div className="md:col-span-2">
                 <Label htmlFor={`date-${tx.id}`}>Date</Label>
                 <Input
@@ -321,7 +332,7 @@ export default function TransactionsPage() {
               <div className="md:col-span-2">
                 <Label htmlFor={`category-${tx.id}`}>Category</Label>
                  <Select
-                  value={tx.category}
+                  value={tx.category || appDefinedCategories[0]}
                   onValueChange={(value) => handleCategoryChange(tx.id, value)}
                 >
                   <SelectTrigger id={`category-${tx.id}`}>
@@ -371,22 +382,22 @@ export default function TransactionsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-date" className="text-right">Date</Label>
-              <Input id="edit-date" type="date" value={currentTransactionForEdit.date} onChange={(e) => handleEditFormChange('date', e.target.value)} className="col-span-3" />
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+              <Label htmlFor="edit-date" className="text-left sm:text-right">Date</Label>
+              <Input id="edit-date" type="date" value={currentTransactionForEdit.date} onChange={(e) => handleEditFormChange('date', e.target.value)} className="col-span-1 sm:col-span-3" />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-description" className="text-right">Description</Label>
-              <Input id="edit-description" value={currentTransactionForEdit.description} onChange={(e) => handleEditFormChange('description', e.target.value)} className="col-span-3" placeholder="e.g., Lunch meeting" />
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+              <Label htmlFor="edit-description" className="text-left sm:text-right">Description</Label>
+              <Input id="edit-description" value={currentTransactionForEdit.description} onChange={(e) => handleEditFormChange('description', e.target.value)} className="col-span-1 sm:col-span-3" placeholder="e.g., Lunch meeting" />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-amount" className="text-right">Amount</Label>
-              <Input id="edit-amount" type="number" value={currentTransactionForEdit.amount.toString()} onChange={(e) => handleEditAmountChange(e.target.value)} className="col-span-3" placeholder="0.00" min="0.01" step="0.01" />
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+              <Label htmlFor="edit-amount" className="text-left sm:text-right">Amount</Label>
+              <Input id="edit-amount" type="number" value={currentTransactionForEdit.amount.toString()} onChange={(e) => handleEditAmountChange(e.target.value)} className="col-span-1 sm:col-span-3" placeholder="0.00" min="0.01" step="0.01" />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-type" className="text-right">Type</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+              <Label htmlFor="edit-type" className="text-left sm:text-right">Type</Label>
               <Select value={currentTransactionForEdit.type} onValueChange={(value: 'income' | 'expense') => handleEditFormChange('type', value)}>
-                <SelectTrigger id="edit-type" className="col-span-3">
+                <SelectTrigger id="edit-type" className="col-span-1 sm:col-span-3">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -395,10 +406,10 @@ export default function TransactionsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-category" className="text-right">Category</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+              <Label htmlFor="edit-category" className="text-left sm:text-right">Category</Label>
               <Select value={currentTransactionForEdit.category} onValueChange={(value) => handleEditFormChange('category', value)}>
-                <SelectTrigger id="edit-category" className="col-span-3">
+                <SelectTrigger id="edit-category" className="col-span-1 sm:col-span-3">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -443,7 +454,7 @@ export default function TransactionsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="md:col-span-2">
+            <div className="sm:col-span-2 md:col-span-1"> {/* Adjusted for better layout */}
               <Label htmlFor="filter-category">Category</Label>
               <Select value={filterCategory} onValueChange={(value) => setFilterCategory(value)}>
                 <SelectTrigger id="filter-category">
@@ -456,23 +467,25 @@ export default function TransactionsPage() {
                 </SelectContent>
               </Select>
             </div>
-             <div className="md:col-span-1">
+             <div className="relative sm:col-span-2 md:col-span-1"> {/* Adjusted for better layout */}
+                <Label htmlFor="filter-search-term">Search Description</Label>
+                <div className="relative">
+                    <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                    id="filter-search-term" 
+                    type="text" 
+                    placeholder="Search descriptions..." 
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8" 
+                    />
+                </div>
+            </div>
+             <div className="sm:col-span-2 md:col-span-1 flex items-end"> {/* Adjusted for better layout */}
               <Button onClick={clearFilters} variant="outline" className="w-full">
                 <FilterX className="mr-2 h-4 w-4" /> Clear Filters
               </Button>
             </div>
-          </div>
-          <div className="relative">
-            <Label htmlFor="filter-search-term">Search Description</Label>
-            <SearchIcon className="absolute left-2.5 top-9 h-4 w-4 text-muted-foreground" />
-            <Input 
-              id="filter-search-term" 
-              type="text" 
-              placeholder="Search descriptions..." 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8" 
-            />
           </div>
         </CardContent>
       </Card>
@@ -483,7 +496,7 @@ export default function TransactionsPage() {
             <CardTitle>All Transactions</CardTitle>
             <CardDescription>A log of all your recorded income and expenses. Use filters above to narrow down the list.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
             {filteredTransactions.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
                     <AlertTriangle className="mx-auto h-12 w-12 mb-4 text-primary" />
@@ -494,12 +507,12 @@ export default function TransactionsPage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead className="text-right">Amount</TableHead>
-                            <TableHead className="text-center">Actions</TableHead>
+                            <TableHead className="min-w-[100px]">Date</TableHead>
+                            <TableHead className="min-w-[200px]">Description</TableHead>
+                            <TableHead className="min-w-[120px]">Category</TableHead>
+                            <TableHead className="min-w-[80px]">Type</TableHead>
+                            <TableHead className="text-right min-w-[100px]">Amount</TableHead>
+                            <TableHead className="text-center min-w-[100px]">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -555,3 +568,4 @@ export default function TransactionsPage() {
   );
 }
 
+    

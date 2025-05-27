@@ -11,7 +11,6 @@ import { Progress } from '@/components/ui/progress';
 import { PlusCircle, Edit3, Trash2, CreditCard, DollarSign, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useDebts, type Debt as ContextDebt } from '@/contexts/DebtContext';
-import { motion } from 'framer-motion';
 
 const initialDebtFormState: Partial<ContextDebt> = {
   name: '',
@@ -31,11 +30,6 @@ const DebtCardComponent = ({ debt, onEdit, onDelete, onMakePayment }: { debt: Co
   };
 
   return (
-    <motion.div
-      className="h-full"
-      whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
-      whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-    >
       <Card className={`rounded-2xl shadow-lg flex flex-col h-full ${isPaidOff ? 'bg-green-50 dark:bg-green-900/30 border-green-500' : ''}`}>
         <CardHeader>
           <div className="flex justify-between items-start">
@@ -51,7 +45,7 @@ const DebtCardComponent = ({ debt, onEdit, onDelete, onMakePayment }: { debt: Co
         </CardHeader>
         <CardContent className="flex-grow space-y-3">
           <div className="flex justify-between items-baseline">
-            <p className="text-2xl font-semibold">{formatCurrency(debt.amountPaid)}</p>
+            <p className="text-xl sm:text-2xl font-semibold">{formatCurrency(debt.amountPaid)}</p>
             <p className="text-sm text-muted-foreground">of {formatCurrency(debt.totalAmount)} paid</p>
           </div>
           <Progress value={progressPercentage} className="h-3 rounded-lg" indicatorClassName={isPaidOff ? 'bg-green-500' : (progressPercentage > 70 ? 'bg-blue-500' : 'bg-blue-400')} />
@@ -74,7 +68,6 @@ const DebtCardComponent = ({ debt, onEdit, onDelete, onMakePayment }: { debt: Co
           </div>
         </CardFooter>
       </Card>
-    </motion.div>
   );
 };
 
@@ -157,7 +150,7 @@ export default function DebtsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Debt Management</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Debt Management</h1>
           <p className="text-muted-foreground">
             Track your loans and credit card balances.
           </p>
@@ -179,25 +172,25 @@ export default function DebtsPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="debt-name" className="text-right">Name</Label>
-                <Input id="debt-name" value={currentDebtForForm?.name || ''} onChange={(e) => setCurrentDebtForForm(prev => ({ ...prev, name: e.target.value }))} className="col-span-3" placeholder="e.g., Student Loan"/>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                <Label htmlFor="debt-name" className="text-left sm:text-right">Name</Label>
+                <Input id="debt-name" value={currentDebtForForm?.name || ''} onChange={(e) => setCurrentDebtForForm(prev => ({ ...prev, name: e.target.value }))} className="col-span-1 sm:col-span-3" placeholder="e.g., Student Loan"/>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="debt-total" className="text-right">Total Amount</Label>
-                <Input id="debt-total" type="number" value={currentDebtForForm?.totalAmount || ''} onChange={(e) => setCurrentDebtForForm(prev => ({ ...prev, totalAmount: parseFloat(e.target.value) || 0 }))} className="col-span-3" placeholder="e.g., 10000"/>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                <Label htmlFor="debt-total" className="text-left sm:text-right">Total Amount</Label>
+                <Input id="debt-total" type="number" value={currentDebtForForm?.totalAmount || ''} onChange={(e) => setCurrentDebtForForm(prev => ({ ...prev, totalAmount: parseFloat(e.target.value) || 0 }))} className="col-span-1 sm:col-span-3" placeholder="e.g., 10000"/>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="debt-paid" className="text-right">Amount Paid</Label>
-                <Input id="debt-paid" type="number" value={currentDebtForForm?.amountPaid || ''} onChange={(e) => setCurrentDebtForForm(prev => ({ ...prev, amountPaid: parseFloat(e.target.value) || 0 }))} className="col-span-3" placeholder="e.g., 1000"/>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                <Label htmlFor="debt-paid" className="text-left sm:text-right">Amount Paid</Label>
+                <Input id="debt-paid" type="number" value={currentDebtForForm?.amountPaid || ''} onChange={(e) => setCurrentDebtForForm(prev => ({ ...prev, amountPaid: parseFloat(e.target.value) || 0 }))} className="col-span-1 sm:col-span-3" placeholder="e.g., 1000"/>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="debt-interest" className="text-right">Interest Rate (%)</Label>
-                <Input id="debt-interest" type="number" value={currentDebtForForm?.interestRate || ''} onChange={(e) => setCurrentDebtForForm(prev => ({ ...prev, interestRate: parseFloat(e.target.value) || undefined }))} className="col-span-3" placeholder="e.g., 4.5 (Optional)"/>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                <Label htmlFor="debt-interest" className="text-left sm:text-right">Interest Rate (%)</Label>
+                <Input id="debt-interest" type="number" value={currentDebtForForm?.interestRate || ''} onChange={(e) => setCurrentDebtForForm(prev => ({ ...prev, interestRate: parseFloat(e.target.value) || undefined }))} className="col-span-1 sm:col-span-3" placeholder="e.g., 4.5 (Optional)"/>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="debt-min-payment" className="text-right">Min. Payment</Label>
-                <Input id="debt-min-payment" type="number" value={currentDebtForForm?.minimumPayment || ''} onChange={(e) => setCurrentDebtForForm(prev => ({ ...prev, minimumPayment: parseFloat(e.target.value) || undefined }))} className="col-span-3" placeholder="e.g., 150 (Optional)"/>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                <Label htmlFor="debt-min-payment" className="text-left sm:text-right">Min. Payment</Label>
+                <Input id="debt-min-payment" type="number" value={currentDebtForForm?.minimumPayment || ''} onChange={(e) => setCurrentDebtForForm(prev => ({ ...prev, minimumPayment: parseFloat(e.target.value) || undefined }))} className="col-span-1 sm:col-span-3" placeholder="e.g., 150 (Optional)"/>
               </div>
             </div>
             <DialogFooter>
@@ -221,18 +214,18 @@ export default function DebtsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="payment-amount" className="text-right">Amount</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+              <Label htmlFor="payment-amount" className="text-left sm:text-right">Amount</Label>
               <Input
                 id="payment-amount"
                 type="number"
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
-                className="col-span-3"
+                className="col-span-1 sm:col-span-3"
                 placeholder="e.g., 100"
               />
             </div>
-             {debtForPayment && <p className="col-span-4 text-sm text-muted-foreground text-right">Remaining Balance: { (debtForPayment.totalAmount - debtForPayment.amountPaid).toLocaleString(undefined, {style:'currency', currency: 'USD'}) }</p>}
+             {debtForPayment && <p className="col-span-1 sm:col-span-4 text-sm text-muted-foreground sm:text-right">Remaining Balance: { (debtForPayment.totalAmount - debtForPayment.amountPaid).toLocaleString(undefined, {style:'currency', currency: 'USD'}) }</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsPaymentFormOpen(false)}>Cancel</Button>
@@ -267,3 +260,5 @@ export default function DebtsPage() {
     </div>
   );
 }
+
+    

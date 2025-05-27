@@ -9,25 +9,24 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useTransactions } from '@/contexts/TransactionContext';
 import { startOfMonth, endOfMonth, isWithinInterval, parseISO, format, isValid } from 'date-fns';
-import { ChartContainer } from "@/components/ui/chart"; // ChartTooltip, ChartTooltipContent removed as not directly used by Pie
+import { ChartContainer } from "@/components/ui/chart"; 
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 import { PieChart as PieChartIcon, Info, CalendarSearch, Download } from 'lucide-react';
 
-// Using the same predefined colors from the dashboard for consistency
 const PREDEFINED_COLORS = [
-  'hsl(231, 48%, 48%)', // Primary Blue
-  'hsl(261, 44%, 58%)', // Accent Purple
-  'hsl(210, 30%, 56%)', // Muted Blue/Gray
-  'hsl(35, 92%, 58%)',  // Orange
-  'hsl(120, 70%, 40%)', // Green
-  'hsl(190, 80%, 55%)', // Teal
-  'hsl(0, 70%, 60%)',   // Reddish
-  'hsl(45, 100%, 50%)', // Yellow
+  'hsl(231, 48%, 48%)', 
+  'hsl(261, 44%, 58%)', 
+  'hsl(210, 30%, 56%)', 
+  'hsl(35, 92%, 58%)',  
+  'hsl(120, 70%, 40%)', 
+  'hsl(190, 80%, 55%)', 
+  'hsl(0, 70%, 60%)',   
+  'hsl(45, 100%, 50%)', 
 ];
 
 const RADIAN = Math.PI / 180;
 const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: any) => {
-  if (percent * 100 < 3) return null; // Don't render label for very small slices
+  if (percent * 100 < 3) return null; 
 
   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -68,7 +67,7 @@ export default function ReportsPage() {
 
     const aggregated = expensesInPeriod.reduce((acc, tx) => {
       if (!acc[tx.category]) {
-        acc[tx.category] = { totalAmount: 0, currency: 'USD' }; // Assuming USD for simplicity, would need multi-currency handling for actual reports
+        acc[tx.category] = { totalAmount: 0, currency: 'USD' }; 
       }
       acc[tx.category].totalAmount += tx.amount;
       return acc;
@@ -105,7 +104,7 @@ export default function ReportsPage() {
       return;
     }
 
-    const headers = ["Category", "Amount (USD)", "Percentage of Total"]; // Assuming USD for now
+    const headers = ["Category", "Amount (USD)", "Percentage of Total"]; 
     const rows = expensesByCategoryForPeriod.map(item => {
       const percentage = totalExpensesForPeriod > 0 ? ((item.value / totalExpensesForPeriod) * 100).toFixed(1) + '%' : '0.0%';
       return [item.name, item.value.toFixed(2), percentage];
@@ -133,7 +132,7 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Financial Reports</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Financial Reports</h1>
         <p className="text-muted-foreground">
           Analyze your spending habits and financial trends.
         </p>
@@ -176,18 +175,18 @@ export default function ReportsPage() {
 
 
       <Card className="rounded-2xl shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle>Expense Breakdown: {reportPeriodTitle}</CardTitle>
-           <Button onClick={handleExportToCsv} variant="outline" size="sm" disabled={expensesByCategoryForPeriod.length === 0}>
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 gap-2">
+          <CardTitle className="text-lg sm:text-xl">Expense Breakdown: {reportPeriodTitle}</CardTitle>
+           <Button onClick={handleExportToCsv} variant="outline" size="sm" disabled={expensesByCategoryForPeriod.length === 0} className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" />
             Export to CSV
           </Button>
         </CardHeader>
         <CardContent>
           {expensesByCategoryForPeriod.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2">
-              <div>
-                <ChartContainer config={{}} className="aspect-square h-[300px] w-full">
+            <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 items-start">
+              <div className="w-full">
+                <ChartContainer config={{}} className="aspect-square h-[250px] sm:h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                       <RechartsTooltip
@@ -203,7 +202,7 @@ export default function ReportsPage() {
                         nameKey="name"
                         cx="50%"
                         cy="50%"
-                        outerRadius={100}
+                        outerRadius={80} 
                         labelLine={false}
                         label={renderCustomizedLabel}
                       >
@@ -216,7 +215,7 @@ export default function ReportsPage() {
                   </ResponsiveContainer>
                 </ChartContainer>
               </div>
-              <div>
+              <div className="overflow-x-auto">
                 <h3 className="text-lg font-semibold mb-2">Expense Summary</h3>
                 <Table>
                   <TableHeader>
@@ -257,3 +256,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    

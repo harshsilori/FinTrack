@@ -112,7 +112,7 @@ export default function SettingsPage() {
       budgets,
       debts,
       backupDate: new Date().toISOString(),
-      appVersion: 'FinTrackMobile_v1.0_LocalBackup', // Example version
+      appVersion: 'FinTrackMobile_v1.0_LocalBackup', 
     };
 
     const jsonString = JSON.stringify(backupData, null, 2);
@@ -150,7 +150,6 @@ export default function SettingsPage() {
         }
         const importedData = JSON.parse(result);
 
-        // Basic validation
         if (
           !importedData ||
           typeof importedData !== 'object' ||
@@ -164,9 +163,6 @@ export default function SettingsPage() {
           return;
         }
         
-        // It's good practice to validate each item in the arrays against their respective types if possible,
-        // but for this prototype, we'll assume the structure is generally correct if the top-level arrays exist.
-
         replaceAllAssets(importedData.assets as Asset[]);
         replaceAllTransactions(importedData.transactions as Transaction[]);
         replaceAllGoals(importedData.goals as Goal[]);
@@ -182,7 +178,6 @@ export default function SettingsPage() {
         console.error("Error parsing or restoring backup:", error);
         toast({ title: "Restore Failed", description: "Could not parse or restore the backup file. Make sure it's a valid FinTrack JSON backup.", variant: "destructive" });
       } finally {
-         // Reset file input to allow selecting the same file again
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
@@ -213,7 +208,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground">
           Manage your account and application preferences.
         </p>
@@ -395,3 +390,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    

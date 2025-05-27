@@ -9,14 +9,12 @@ import { Progress } from "@/components/ui/progress";
 import { Bitcoin, Landmark, BarChartBig, WalletCards, TrendingUp, DollarSign, PiggyBank, Building2, AlertTriangle, Target, Plane, ShieldCheck, AreaChart, PieChart as PieChartIcon, Info, CreditCard } from "lucide-react"; 
 import Link from "next/link";
 import Image from 'next/image';
-import { useAssets } from "@/contexts/AssetContext";
-import { useGoals } from "@/contexts/GoalContext"; 
+import { useAssets, type Asset } from "@/contexts/AssetContext"; // Updated to use Asset type from context directly
+import { useGoals, type Goal } from "@/contexts/GoalContext"; 
 import { useTransactions, type Transaction } from "@/contexts/TransactionContext";
-import type { Asset } from "@/contexts/AssetContext";
-import type { Goal } from "@/contexts/GoalContext";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+// Removed direct Asset type import as it's now from useAssets
+import { ChartContainer } from "@/components/ui/chart"; // ChartTooltip, ChartTooltipContent removed as not directly used
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
-import { motion } from 'framer-motion';
 
 
 const categoryIcons: Record<AssetCategory | 'total' | 'allocation', React.ReactNode> = {
@@ -33,7 +31,10 @@ const goalDisplayIcons: Record<string, React.ReactNode> = {
   Target: <Target className="h-5 w-5 text-primary" />,
   ShieldCheck: <ShieldCheck className="h-5 w-5 text-green-500" />,
   Plane: <Plane className="h-5 w-5 text-blue-500" />,
-  Default: <Target className="h-5 w-5 text-primary" />,
+  Home: <Home className="h-5 w-5 text-orange-500" />,
+  Car: <Car className="h-5 w-5 text-purple-500" />,
+  Gift: <Gift className="h-5 w-5 text-pink-500" />,
+  Default: <Target className="h-5 w-5 text-gray-500" />,
 };
 
 
@@ -46,14 +47,14 @@ interface CategorySummary {
 }
 
 const PREDEFINED_COLORS = [
-  'hsl(231, 48%, 48%)', 
-  'hsl(261, 44%, 58%)', 
-  'hsl(210, 30%, 56%)', 
-  'hsl(35, 92%, 58%)',  
-  'hsl(120, 70%, 40%)', 
-  'hsl(190, 80%, 55%)', 
-  'hsl(0, 70%, 60%)',   
-  'hsl(45, 100%, 50%)', 
+  'hsl(231, 48%, 48%)', // Primary Blue
+  'hsl(261, 44%, 58%)', // Accent Purple
+  'hsl(210, 30%, 56%)', // Muted Blue/Gray
+  'hsl(35, 92%, 58%)',  // Orange
+  'hsl(120, 70%, 40%)', // Green
+  'hsl(190, 80%, 55%)', // Teal
+  'hsl(0, 70%, 60%)',   // Reddish
+  'hsl(45, 100%, 50%)', // Yellow
 ];
 
 const RADIAN = Math.PI / 180;
@@ -73,7 +74,7 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
 
 
 export default function HomePage() {
-  const { assets, getAssetMarketValue } = useAssets();
+  const { assets } = useAssets();
   const { goals } = useGoals(); 
   const { transactions, getTransactionsByMonth } = useTransactions();
 
@@ -83,7 +84,9 @@ export default function HomePage() {
 
   const portfolioTotalsByCurrency: Record<string, number> = {};
   assets.forEach(asset => {
-    const marketValue = getAssetMarketValue(asset);
+    const marketValue = (asset.category === 'bank' || asset.category === 'property')
+      ? asset.currentPrice
+      : asset.currentPrice * asset.quantity;
     portfolioTotalsByCurrency[asset.currency] = (portfolioTotalsByCurrency[asset.currency] || 0) + marketValue;
   });
 
@@ -101,7 +104,9 @@ export default function HomePage() {
     }
 
     const summary = categorySummariesByCurrency[asset.currency][asset.category];
-    const marketValue = getAssetMarketValue(asset);
+    const marketValue = (asset.category === 'bank' || asset.category === 'property')
+      ? asset.currentPrice
+      : asset.currentPrice * asset.quantity;
     
     summary.totalValue += marketValue;
     summary.assetCount += 1;
@@ -162,7 +167,9 @@ export default function HomePage() {
   const currenciesPresentInAllocation = new Set<string>();
 
   assets.forEach(asset => {
-    const marketValue = getAssetMarketValue(asset);
+    const marketValue = (asset.category === 'bank' || asset.category === 'property')
+      ? asset.currentPrice
+      : asset.currentPrice * asset.quantity;
     const categoryName = categoryDisplayNames[asset.category] || asset.category;
     aggregatedValuesByCat[categoryName] = (aggregatedValuesByCat[categoryName] || 0) + marketValue;
     currenciesPresentInAllocation.add(asset.currency);
@@ -184,17 +191,15 @@ export default function HomePage() {
     });
   });
 
-
   const isMixedCurrencyAllocation = currenciesPresentInAllocation.size > 1;
-
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Your financial overview. All prices are manually entered.
+            Your financial overview. Prices are manually entered.
           </p>
         </div>
          <Link href="/transactions" passHref>
@@ -205,10 +210,6 @@ export default function HomePage() {
       </div>
 
       {Object.keys(portfolioTotalsByCurrency).length > 0 ? (
-         <motion.div
-            whileHover={{ scale: 1.01, y: -2, transition: { type: "spring", stiffness: 300, damping: 15 } }}
-            whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-        >
         <Card className="rounded-2xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-lg sm:text-xl">Total Net Worth</CardTitle>
@@ -224,7 +225,6 @@ export default function HomePage() {
             <p className="text-xs text-muted-foreground pt-1">Calculated from manually entered current asset values.</p>
           </CardContent>
         </Card>
-        </motion.div>
       ) : (
          <Card className="rounded-2xl shadow-lg col-span-1 md:col-span-2 lg:col-span-3">
             <CardContent className="pt-6 text-center text-muted-foreground">
@@ -241,10 +241,6 @@ export default function HomePage() {
       )}
 
       {assetAllocationData.length > 0 && (
-        <motion.div
-            whileHover={{ scale: 1.01, y: -2, transition: { type: "spring", stiffness: 300, damping: 15 } }}
-            whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-        >
         <Card className="rounded-2xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-lg sm:text-xl">Asset Allocation</CardTitle>
@@ -254,7 +250,7 @@ export default function HomePage() {
             {isMixedCurrencyAllocation && (
               <div className="mb-2 text-xs text-muted-foreground flex items-center gap-1 p-2 bg-muted/50 rounded-md">
                 <Info className="h-4 w-4 text-primary shrink-0" />
-                <span>Note: This chart sums numerical values of assets in different currencies without conversion. For precise allocation with multiple currencies, consider a single currency view or future conversion features.</span>
+                <span>Note: This chart sums numerical values of assets in different currencies without conversion.</span>
               </div>
             )}
             <ChartContainer config={{}} className="aspect-video h-[250px] w-full sm:h-[300px]">
@@ -297,14 +293,13 @@ export default function HomePage() {
              <p className="text-xs text-muted-foreground text-center pt-2">Showing allocation of total portfolio value by asset category.</p>
           </CardContent>
         </Card>
-        </motion.div>
       )}
 
 
       {Object.entries(categorySummariesByCurrency).map(([currency, summaries]) => (
         <div key={currency} className="space-y-6">
           {Object.keys(portfolioTotalsByCurrency).length > 1 && (
-            <h2 className="text-2xl font-semibold tracking-tight mt-6 border-b pb-2">Asset Summaries ({currency})</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold tracking-tight mt-6 border-b pb-2">Asset Summaries ({currency})</h2>
           )}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {orderedCategories.map((category) => {
@@ -320,12 +315,6 @@ export default function HomePage() {
               };
 
               return (
-                <motion.div
-                    key={`${category}-${currency}-motion`}
-                    className="h-full"
-                    whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
-                    whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-                >
                 <Card key={`${category}-${currency}`} className="rounded-2xl shadow-lg h-full flex flex-col">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-base font-medium">{titleMap[category]}</CardTitle>
@@ -353,7 +342,6 @@ export default function HomePage() {
                     </Link>
                   </CardFooter>
                 </Card>
-                </motion.div>
               );
             })}
           </div>
@@ -361,14 +349,9 @@ export default function HomePage() {
       ))}
       
       <div className="grid gap-6 md:grid-cols-2">
-        <motion.div
-            className="h-full"
-            whileHover={{ scale: 1.01, y: -2, transition: { type: "spring", stiffness: 300, damping: 15 } }}
-            whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-        >
         <Card className="rounded-2xl shadow-lg h-full flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Month's Overview</CardTitle>
+            <CardTitle className="text-base sm:text-lg font-medium">This Month's Overview</CardTitle>
             <PieChartIcon className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent className="flex-grow">
@@ -383,7 +366,7 @@ export default function HomePage() {
               </div>
             </div>
             {monthlyExpensePieChartData.length > 0 ? (
-              <ChartContainer config={{}} className="aspect-square h-[200px] w-full">
+              <ChartContainer config={{}} className="aspect-square h-[200px] sm:h-[250px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <RechartsTooltip
@@ -423,23 +406,17 @@ export default function HomePage() {
             </Link>
           </CardFooter>
         </Card>
-        </motion.div>
 
 
         {goals.length > 0 && (
-            <motion.div
-                className="h-full"
-                whileHover={{ scale: 1.01, y: -2, transition: { type: "spring", stiffness: 300, damping: 15 } }}
-                whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-            >
               <Card className="rounded-2xl shadow-lg h-full flex flex-col">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Top Goal Progress</CardTitle>
+                  <CardTitle className="text-base sm:text-lg font-medium">Top Goal Progress</CardTitle>
                   {goalDisplayIcons[goals[0].icon || 'Default'] || goalDisplayIcons.Default}
                 </CardHeader>
                 <CardContent className="flex-grow">
                   <p className="text-md font-semibold">{goals[0].name}</p>
-                  <Progress value={(goals[0].currentAmount / goals[0].targetAmount) * 100} className="my-2 h-2" />
+                  <Progress value={(goals[0].targetAmount > 0 ? (goals[0].currentAmount / goals[0].targetAmount) * 100 : 0)} className="my-2 h-2" />
                   <p className="text-xs text-muted-foreground">
                     {formatCurrency(goals[0].currentAmount, 'USD')} / {formatCurrency(goals[0].targetAmount, 'USD')}
                   </p>
@@ -450,18 +427,12 @@ export default function HomePage() {
                   </Link>
                 </CardFooter>
               </Card>
-            </motion.div>
         )}
 
         {goals.length === 0 && (
-            <motion.div
-                className="h-full"
-                whileHover={{ scale: 1.01, y: -2, transition: { type: "spring", stiffness: 300, damping: 15 } }}
-                whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-            >
            <Card className="rounded-2xl shadow-lg h-full flex flex-col">
              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-               <CardTitle className="text-sm font-medium">Financial Goals</CardTitle>
+               <CardTitle className="text-base sm:text-lg font-medium">Financial Goals</CardTitle>
                <Target className="h-5 w-5 text-primary" />
              </CardHeader>
              <CardContent className="flex-grow">
@@ -473,17 +444,11 @@ export default function HomePage() {
                </Link>
              </CardFooter>
            </Card>
-           </motion.div>
         )}
 
-        <motion.div
-            className="h-full"
-            whileHover={{ scale: 1.01, y: -2, transition: { type: "spring", stiffness: 300, damping: 15 } }}
-            whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-        >
         <Card className="rounded-2xl shadow-lg h-full flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Budget Health</CardTitle>
+                <CardTitle className="text-base sm:text-lg font-medium">Budget Health</CardTitle>
                 <PiggyBank className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent className="flex-grow">
@@ -496,16 +461,10 @@ export default function HomePage() {
                 </Link>
             </CardFooter>
         </Card>
-        </motion.div>
 
-        <motion.div
-            className="h-full"
-            whileHover={{ scale: 1.01, y: -2, transition: { type: "spring", stiffness: 300, damping: 15 } }}
-            whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-        >
         <Card className="rounded-2xl shadow-lg h-full flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Debt Overview</CardTitle>
+            <CardTitle className="text-base sm:text-lg font-medium">Debt Overview</CardTitle>
             <CreditCard className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent className="flex-grow">
@@ -518,16 +477,10 @@ export default function HomePage() {
             </Link>
           </CardFooter>
         </Card>
-        </motion.div>
         
-        <motion.div
-            className="h-full"
-            whileHover={{ scale: 1.01, y: -2, transition: { type: "spring", stiffness: 300, damping: 15 } }}
-            whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-        >
         <Card className="rounded-2xl shadow-lg h-full flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">AI Savings Tip</CardTitle>
+            <CardTitle className="text-base sm:text-lg font-medium">AI Savings Tip</CardTitle>
             <Image src="https://placehold.co/24x24.png" alt="AI Icon" width={24} height={24} data-ai-hint="robot lightbulb"/>
           </CardHeader>
           <CardContent className="flex-grow">
@@ -540,9 +493,7 @@ export default function HomePage() {
             </Link>
           </CardFooter>
         </Card>
-        </motion.div>
       </div>
-
     </div>
   );
 }
@@ -554,3 +505,5 @@ const categoryDisplayNames: Record<AssetCategory | string, string> = {
   property: "Properties",
   mutualfund: "Mutual Funds",
 };
+
+    

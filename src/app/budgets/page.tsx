@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -12,10 +12,8 @@ import { Progress } from '@/components/ui/progress';
 import { PlusCircle, Edit3, Trash2, PiggyBank } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useTransactions, type Transaction } from '@/contexts/TransactionContext';
-import { useBudgets, type Budget, budgetPeriods, budgetCategories } from '@/contexts/BudgetContext'; // Import from BudgetContext
+import { useBudgets, type Budget, budgetPeriods, budgetCategories } from '@/contexts/BudgetContext'; 
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
-import { motion } from 'framer-motion';
-
 
 const BudgetCard = React.memo(({ 
   budget, 
@@ -80,11 +78,6 @@ const BudgetCard = React.memo(({
 
 
   return (
-    <motion.div
-      className="h-full"
-      whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
-      whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-    >
       <Card key={budget.id} className="rounded-2xl shadow-lg flex flex-col h-full">
         <CardHeader>
           <div className="flex justify-between items-start">
@@ -101,7 +94,7 @@ const BudgetCard = React.memo(({
           ) : (
             <>
               <div className="flex justify-between items-baseline">
-                <p className="text-2xl font-semibold">{formatCurrency(calculatedSpent)}</p>
+                <p className="text-xl sm:text-2xl font-semibold">{formatCurrency(calculatedSpent)}</p>
                 <p className="text-sm text-muted-foreground">of {formatCurrency(budget.amount)}</p>
               </div>
               <Progress value={spentPercentage} className="h-3 rounded-lg" indicatorClassName={getProgressColor(spentPercentage)} />
@@ -118,7 +111,6 @@ const BudgetCard = React.memo(({
           </Button>
         </CardFooter>
       </Card>
-    </motion.div>
   );
 });
 BudgetCard.displayName = 'BudgetCard';
@@ -127,7 +119,7 @@ BudgetCard.displayName = 'BudgetCard';
 export default function BudgetsPage() {
   const { toast } = useToast();
   const { transactions } = useTransactions(); 
-  const { budgets, addBudget, updateBudget, deleteBudget: deleteBudgetFromContext } = useBudgets(); // Use context
+  const { budgets, addBudget, updateBudget, deleteBudget: deleteBudgetFromContext } = useBudgets(); 
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentBudget, setCurrentBudget] = useState<Partial<Budget> | null>(null);
@@ -150,10 +142,10 @@ export default function BudgetsPage() {
     const budgetDataToSave = { ...currentBudget };
 
     if (budgetDataToSave.id) {
-      updateBudget(budgetDataToSave as Budget); // Use context update
+      updateBudget(budgetDataToSave as Budget); 
       toast({ title: "Budget Updated", description: `${budgetDataToSave.name} has been updated.`});
     } else {
-      addBudget(budgetDataToSave as Omit<Budget, 'id'>); // Use context add
+      addBudget(budgetDataToSave as Omit<Budget, 'id'>); 
       toast({ title: "Budget Added", description: `${budgetDataToSave.name} has been added.`});
     }
     setIsFormOpen(false);
@@ -161,7 +153,7 @@ export default function BudgetsPage() {
   };
 
   const handleDeleteBudget = (id: string) => {
-    deleteBudgetFromContext(id); // Use context delete
+    deleteBudgetFromContext(id); 
     toast({ title: "Budget Deleted", description: `Budget has been removed.`, variant: "destructive"});
   };
   
@@ -170,7 +162,7 @@ export default function BudgetsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Budget Manager</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Budget Manager</h1>
           <p className="text-muted-foreground">
             Create and track your spending budgets. Spent amounts for monthly/weekly budgets are automatically calculated from your transactions.
           </p>
@@ -192,18 +184,18 @@ export default function BudgetsPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">Name</Label>
-                <Input id="name" value={currentBudget?.name || ''} onChange={(e) => setCurrentBudget(prev => ({...prev, name: e.target.value }))} className="col-span-3" placeholder="e.g., Monthly Groceries"/>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                <Label htmlFor="name" className="text-left sm:text-right">Name</Label>
+                <Input id="name" value={currentBudget?.name || ''} onChange={(e) => setCurrentBudget(prev => ({...prev, name: e.target.value }))} className="col-span-1 sm:col-span-3" placeholder="e.g., Monthly Groceries"/>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="amount" className="text-right">Amount</Label>
-                <Input id="amount" type="number" value={currentBudget?.amount || ''} onChange={(e) => setCurrentBudget(prev => ({...prev, amount: parseFloat(e.target.value) || 0 }))} className="col-span-3" placeholder="e.g., 500"/>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                <Label htmlFor="amount" className="text-left sm:text-right">Amount</Label>
+                <Input id="amount" type="number" value={currentBudget?.amount || ''} onChange={(e) => setCurrentBudget(prev => ({...prev, amount: parseFloat(e.target.value) || 0 }))} className="col-span-1 sm:col-span-3" placeholder="e.g., 500"/>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="category" className="text-right">Category</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                <Label htmlFor="category" className="text-left sm:text-right">Category</Label>
                 <Select value={currentBudget?.category || ''} onValueChange={(value) => setCurrentBudget(prev => ({...prev, category: value}))}>
-                  <SelectTrigger className="col-span-3">
+                  <SelectTrigger className="col-span-1 sm:col-span-3">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -211,10 +203,10 @@ export default function BudgetsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="period" className="text-right">Period</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                <Label htmlFor="period" className="text-left sm:text-right">Period</Label>
                 <Select value={currentBudget?.period || 'monthly'} onValueChange={(value: Budget['period']) => setCurrentBudget(prev => ({...prev, period: value}))}>
-                  <SelectTrigger className="col-span-3">
+                  <SelectTrigger className="col-span-1 sm:col-span-3">
                     <SelectValue placeholder="Select period" />
                   </SelectTrigger>
                   <SelectContent>
@@ -223,9 +215,9 @@ export default function BudgetsPage() {
                 </Select>
               </div>
               {currentBudget?.period === 'custom' && (
-                 <div className="grid grid-cols-4 items-center gap-4">
-                   <Label htmlFor="customPeriodDetails" className="text-right">Details</Label>
-                   <Input id="customPeriodDetails" value={currentBudget?.customPeriodDetails || ''} onChange={(e) => setCurrentBudget(prev => ({...prev, customPeriodDetails: e.target.value }))} className="col-span-3" placeholder="e.g., Summer Vacation Trip"/>
+                 <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                   <Label htmlFor="customPeriodDetails" className="text-left sm:text-right">Details</Label>
+                   <Input id="customPeriodDetails" value={currentBudget?.customPeriodDetails || ''} onChange={(e) => setCurrentBudget(prev => ({...prev, customPeriodDetails: e.target.value }))} className="col-span-1 sm:col-span-3" placeholder="e.g., Summer Vacation Trip"/>
                  </div>
               )}
             </div>
@@ -263,3 +255,5 @@ export default function BudgetsPage() {
     </div>
   );
 }
+
+    

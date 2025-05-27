@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -14,7 +14,6 @@ import { useGoals, type Goal as ContextGoal } from '@/contexts/GoalContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, differenceInDays, isValid, parseISO } from 'date-fns';
-import { motion } from 'framer-motion';
 
 const goalIcons: Record<string, React.ReactNode> = {
   Target: <Target className="h-8 w-8 text-primary" />,
@@ -35,7 +34,7 @@ const initialGoalFormState: Partial<ContextGoal> = {
 };
 
 
-const GoalCardComponent = ({ goal, onEdit, onDelete, onAddFunds }: { goal: ContextGoal; onEdit: (goal: ContextGoal) => void; onDelete: (id: string) => void; onAddFunds: (id: string) => void; }) => {
+const GoalCardComponent = React.memo(({ goal, onEdit, onDelete, onAddFunds }: { goal: ContextGoal; onEdit: (goal: ContextGoal) => void; onDelete: (id: string) => void; onAddFunds: (id: string) => void; }) => {
   const progressPercentage = goal.targetAmount > 0 ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100) : 0;
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -65,11 +64,6 @@ const GoalCardComponent = ({ goal, onEdit, onDelete, onAddFunds }: { goal: Conte
   };
 
   return (
-    <motion.div
-      className="h-full"
-      whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
-      whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
-    >
       <Card className={`rounded-2xl shadow-lg flex flex-col h-full ${isCompleted ? 'bg-green-50 dark:bg-green-900/30 border-green-500' : ''}`}>
         <CardHeader>
           <div className="flex justify-between items-start">
@@ -88,7 +82,7 @@ const GoalCardComponent = ({ goal, onEdit, onDelete, onAddFunds }: { goal: Conte
         </CardHeader>
         <CardContent className="flex-grow space-y-3">
           <div className="flex justify-between items-baseline">
-            <p className="text-2xl font-semibold">{formatCurrency(goal.currentAmount)}</p>
+            <p className="text-xl sm:text-2xl font-semibold">{formatCurrency(goal.currentAmount)}</p>
             <p className="text-sm text-muted-foreground">of {formatCurrency(goal.targetAmount)}</p>
           </div>
           <Progress value={progressPercentage} className="h-3 rounded-lg" indicatorClassName={isCompleted ? 'bg-green-500' : (progressPercentage > 70 ? 'bg-blue-500' : 'bg-blue-400')} />
@@ -116,9 +110,9 @@ const GoalCardComponent = ({ goal, onEdit, onDelete, onAddFunds }: { goal: Conte
           </div>
         </CardFooter>
       </Card>
-    </motion.div>
   );
-};
+});
+GoalCardComponent.displayName = 'GoalCardComponent';
 
 
 export default function GoalsPage() {
@@ -194,7 +188,7 @@ export default function GoalsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Financial Goals</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Financial Goals</h1>
           <p className="text-muted-foreground">
             Set and track your financial aspirations.
           </p>
@@ -216,25 +210,25 @@ export default function GoalsPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="goal-name" className="text-right">Name</Label>
-                <Input id="goal-name" value={currentGoalForForm?.name || ''} onChange={(e) => setCurrentGoalForForm(prev => ({ ...prev, name: e.target.value }))} className="col-span-3" placeholder="e.g., New Car Fund"/>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                <Label htmlFor="goal-name" className="text-left sm:text-right">Name</Label>
+                <Input id="goal-name" value={currentGoalForForm?.name || ''} onChange={(e) => setCurrentGoalForForm(prev => ({ ...prev, name: e.target.value }))} className="col-span-1 sm:col-span-3" placeholder="e.g., New Car Fund"/>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="goal-target" className="text-right">Target Amount</Label>
-                <Input id="goal-target" type="number" value={currentGoalForForm?.targetAmount || ''} onChange={(e) => setCurrentGoalForForm(prev => ({ ...prev, targetAmount: parseFloat(e.target.value) || 0 }))} className="col-span-3" placeholder="e.g., 20000"/>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                <Label htmlFor="goal-target" className="text-left sm:text-right">Target Amount</Label>
+                <Input id="goal-target" type="number" value={currentGoalForForm?.targetAmount || ''} onChange={(e) => setCurrentGoalForForm(prev => ({ ...prev, targetAmount: parseFloat(e.target.value) || 0 }))} className="col-span-1 sm:col-span-3" placeholder="e.g., 20000"/>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="goal-current" className="text-right">Current Amount</Label>
-                <Input id="goal-current" type="number" value={currentGoalForForm?.currentAmount || ''} onChange={(e) => setCurrentGoalForForm(prev => ({ ...prev, currentAmount: parseFloat(e.target.value) || 0 }))} className="col-span-3" placeholder="e.g., 5000"/>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                <Label htmlFor="goal-current" className="text-left sm:text-right">Current Amount</Label>
+                <Input id="goal-current" type="number" value={currentGoalForForm?.currentAmount || ''} onChange={(e) => setCurrentGoalForForm(prev => ({ ...prev, currentAmount: parseFloat(e.target.value) || 0 }))} className="col-span-1 sm:col-span-3" placeholder="e.g., 5000"/>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="goal-date" className="text-right">Target Date</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                <Label htmlFor="goal-date" className="text-left sm:text-right">Target Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant={"outline"}
-                      className={`col-span-3 justify-start text-left font-normal ${!currentGoalForForm?.targetDate && "text-muted-foreground"}`}
+                      className={`col-span-1 sm:col-span-3 justify-start text-left font-normal ${!currentGoalForForm?.targetDate && "text-muted-foreground"}`}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {currentGoalForForm?.targetDate ? format(parseISO(currentGoalForForm.targetDate), "PPP") : <span>Pick a date (Optional)</span>}
@@ -250,13 +244,13 @@ export default function GoalsPage() {
                   </PopoverContent>
                 </Popover>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="goal-icon" className="text-right">Icon</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+                  <Label htmlFor="goal-icon" className="text-left sm:text-right">Icon</Label>
                   <select
                     id="goal-icon"
                     value={currentGoalForForm?.icon || 'Target'}
                     onChange={(e) => setCurrentGoalForForm(prev => ({ ...prev, icon: e.target.value }))}
-                    className="col-span-3 flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="col-span-1 sm:col-span-3 flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {availableIcons.map(iconKey => (
                         <option key={iconKey} value={iconKey}>{iconKey.replace(/([A-Z])/g, ' $1').trim()}</option>
@@ -282,14 +276,14 @@ export default function GoalsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="contribution-amount" className="text-right">Amount</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
+              <Label htmlFor="contribution-amount" className="text-left sm:text-right">Amount</Label>
               <Input
                 id="contribution-amount"
                 type="number"
                 value={contributionAmount || ''}
                 onChange={(e) => setContributionAmount(parseFloat(e.target.value) || 0)}
-                className="col-span-3"
+                className="col-span-1 sm:col-span-3"
                 placeholder="e.g., 100"
               />
             </div>
@@ -327,3 +321,5 @@ export default function GoalsPage() {
     </div>
   );
 }
+
+    
