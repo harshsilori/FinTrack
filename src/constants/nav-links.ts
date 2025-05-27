@@ -1,6 +1,6 @@
 
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, ArrowLeftRight, Wallet, Lightbulb, Settings, PiggyBank, Target, AreaChart } from 'lucide-react'; // Added AreaChart
+import { LayoutDashboard, ArrowLeftRight, Wallet, Lightbulb, Settings, PiggyBank, Target, AreaChart, CreditCard } from 'lucide-react'; // Added CreditCard for Debts
 
 export interface NavLink {
   href: string;
@@ -37,7 +37,12 @@ export const NAV_LINKS: NavLink[] = [
     icon: Target,
   },
   {
-    href: '/reports', // New Reports link
+    href: '/debts', // New Debts link
+    label: 'Debts',
+    icon: CreditCard,
+  },
+  {
+    href: '/reports',
     label: 'Reports',
     icon: AreaChart,
   },

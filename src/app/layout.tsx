@@ -6,7 +6,10 @@ import { AppShell } from '@/components/layout/app-shell';
 import { Toaster } from "@/components/ui/toaster";
 import { AssetProvider } from '@/contexts/AssetContext';
 import { GoalProvider } from '@/contexts/GoalContext';
-import { TransactionProvider } from '@/contexts/TransactionContext'; // Import TransactionProvider
+import { TransactionProvider } from '@/contexts/TransactionContext';
+import { DebtProvider } from '@/contexts/DebtContext'; // Import DebtProvider
+import Script from 'next/script';
+
 
 const roboto = Roboto({
   weight: ['300', '400', '500', '700'],
@@ -27,13 +30,33 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+      <Script id="theme-loader" strategy="beforeInteractive">
+          {`
+            try {
+              const darkMode = localStorage.getItem('darkMode');
+              const accentTheme = localStorage.getItem('accentTheme');
+              if (darkMode === 'true') {
+                document.documentElement.classList.add('dark');
+              }
+              if (accentTheme && accentTheme !== 'theme-default') {
+                document.documentElement.classList.add(accentTheme);
+              } else if (!accentTheme) {
+                 document.documentElement.classList.add('theme-default');
+              }
+            } catch (e) {}
+          `}
+        </Script>
+      </head>
       <body className={`${roboto.variable} font-sans antialiased`}>
         <AssetProvider>
           <GoalProvider>
-            <TransactionProvider> {/* Wrap with TransactionProvider */}
-              <AppShell>
-                {children}
-              </AppShell>
+            <TransactionProvider>
+              <DebtProvider> {/* Wrap with DebtProvider */}
+                <AppShell>
+                  {children}
+                </AppShell>
+              </DebtProvider>
             </TransactionProvider>
           </GoalProvider>
         </AssetProvider>

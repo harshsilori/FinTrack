@@ -6,7 +6,7 @@ import type { AssetCategory } from "@/contexts/AssetContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Bitcoin, Landmark, BarChartBig, WalletCards, TrendingUp, DollarSign, PiggyBank, Building2, AlertTriangle, Target, Plane, ShieldCheck, AreaChart, PieChart as PieChartIcon, Info } from "lucide-react";
+import { Bitcoin, Landmark, BarChartBig, WalletCards, TrendingUp, DollarSign, PiggyBank, Building2, AlertTriangle, Target, Plane, ShieldCheck, AreaChart, PieChart as PieChartIcon, Info, CreditCard } from "lucide-react"; // Added CreditCard
 import Link from "next/link";
 import Image from 'next/image';
 import { useAssets } from "@/contexts/AssetContext";
@@ -53,8 +53,6 @@ const PREDEFINED_COLORS = [
   'hsl(190, 80%, 55%)', // Teal
   'hsl(0, 70%, 60%)',   // Reddish
   'hsl(45, 100%, 50%)', // Yellow
-  'hsl(231, 30%, 68%)', // Chart-4 from light theme
-  'hsl(261, 30%, 78%)', // Chart-5 from light theme
 ];
 
 // Helper for pie chart label rendering
@@ -278,7 +276,7 @@ export default function HomePage() {
                     label={renderCustomizedLabel}
                   >
                     {assetAllocationData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={2}/>
+                      <Cell key={`cell-allocation-${index}`} fill={entry.fill!} stroke="hsl(var(--background))" strokeWidth={2}/>
                     ))}
                   </Pie>
                   <Legend 
@@ -391,7 +389,7 @@ export default function HomePage() {
                         }}
                     >
                       {monthlyExpensePieChartData.map((entry, index) => (
-                        <Cell key={`cell-expense-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={2}/>
+                        <Cell key={`cell-expense-${index}`} fill={entry.fill!} stroke="hsl(var(--background))" strokeWidth={2}/>
                       ))}
                     </Pie>
                   </PieChart>
@@ -449,22 +447,6 @@ export default function HomePage() {
         )}
 
         <Card className="rounded-2xl shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">AI Savings Tip</CardTitle>
-            <Image src="https://placehold.co/24x24.png" alt="AI Icon" width={24} height={24} data-ai-hint="robot lightbulb"/>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm">Review your streaming subscriptions. You could save $25/month!</p>
-            <p className="text-xs text-muted-foreground pt-1">Actual AI insights based on your data are available on the Insights page.</p>
-          </CardContent>
-           <CardFooter>
-            <Link href="/insights" className="w-full">
-              <Button variant="outline" className="w-full">Get Personalized Insights</Button>
-            </Link>
-          </CardFooter>
-        </Card>
-        
-        <Card className="rounded-2xl shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Budget Health</CardTitle>
                 <PiggyBank className="h-5 w-5 text-primary" />
@@ -479,6 +461,38 @@ export default function HomePage() {
                 </Link>
             </CardFooter>
         </Card>
+
+        <Card className="rounded-2xl shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Debt Overview</CardTitle>
+            <CreditCard className="h-5 w-5 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm">Track your liabilities and progress towards becoming debt-free.</p>
+             <p className="text-xs text-muted-foreground pt-1">Detailed debt management is available on the Debts page.</p>
+          </CardContent>
+           <CardFooter>
+            <Link href="/debts" className="w-full">
+              <Button variant="outline" className="w-full">Manage Debts</Button>
+            </Link>
+          </CardFooter>
+        </Card>
+        
+        <Card className="rounded-2xl shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">AI Savings Tip</CardTitle>
+            <Image src="https://placehold.co/24x24.png" alt="AI Icon" width={24} height={24} data-ai-hint="robot lightbulb"/>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm">Review your streaming subscriptions. You could save $25/month!</p>
+            <p className="text-xs text-muted-foreground pt-1">Actual AI insights based on your data are available on the Insights page.</p>
+          </CardContent>
+           <CardFooter>
+            <Link href="/insights" className="w-full">
+              <Button variant="outline" className="w-full">Get Personalized Insights</Button>
+            </Link>
+          </CardFooter>
+        </Card>
       </div>
 
     </div>
@@ -492,4 +506,3 @@ const categoryDisplayNames: Record<AssetCategory | string, string> = {
   property: "Properties",
   mutualfund: "Mutual Funds",
 };
-
