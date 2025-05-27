@@ -1,6 +1,3 @@
-
-'use client';
-
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -57,7 +54,6 @@ const categoryDisplayNames: Record<AssetCategory | 'overview', string> = {
 
 const orderedAssetCategories: AssetCategory[] = ['bank', 'stock', 'crypto', 'property', 'mutualfund'];
 
-
 const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: ContextAsset, onEdit: (asset: ContextAsset) => void, onDelete: (id: string) => void }) => {
   const isTrackableAsset = asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund';
   const [clientFormattedLastUpdated, setClientFormattedLastUpdated] = useState<string | null>(null);
@@ -69,7 +65,6 @@ const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: Con
       setClientFormattedLastUpdated(null);
     }
   }, [asset.lastUpdated]);
-
 
   const marketValue = (asset.category === 'bank' || asset.category === 'property')
     ? asset.currentPrice
@@ -93,7 +88,6 @@ const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: Con
   };
   
   const iconToDisplay = assetIcons[asset.category] || assetIcons.overview;
-
 
   return (
       <motion.div
@@ -154,7 +148,6 @@ const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: Con
 });
 AssetCardComponent.displayName = 'AssetCardComponent';
 
-
 export default function AssetsPage() {
   const { toast } = useToast();
   const { assets: allAssets, addAsset, updateAsset, deleteAsset: deleteAssetFromContext } = useAssets();
@@ -171,22 +164,18 @@ export default function AssetsPage() {
     setIsMounted(true);
   }, []);
 
-  useEffect(() => {
-    console.log("[AssetsPage] allAssets from context:", allAssets);
-  }, [allAssets]);
-
-
   const activeTab = useMemo(() => {
-    const tabParam = searchParams.get('category') as AssetCategory | 'overview' | null;
+    if (!isMounted) return 'overview';
+    const tabParam = searchParams?.get('category') as AssetCategory | 'overview' | null;
     if (tabParam && (orderedAssetCategories.includes(tabParam as AssetCategory) || tabParam === 'overview')) {
-        return tabParam;
+      return tabParam;
     }
-    return 'overview'; 
-  }, [searchParams]);
-
+    return 'overview';
+  }, [searchParams, isMounted]);
 
   const handleTabChange = (newTabValue: string) => {
-    const params = new URLSearchParams(searchParams.toString());
+    if (!isMounted) return;
+    const params = new URLSearchParams(searchParams?.toString() || '');
     if (newTabValue === 'overview') {
       params.delete('category');
     } else {
@@ -314,7 +303,6 @@ export default function AssetsPage() {
     return {};
   }, [allAssets, activeTab]);
 
-
   const handleCategoryChangeInForm = (value: AssetCategory) => {
     const newState: Partial<ContextAsset> = { ...currentAssetForForm, category: value, currentPrice: currentAssetForForm.currentPrice || 0 };
     const isNewCategoryTrackable = value === 'stock' || value === 'crypto' || value === 'mutualfund';
@@ -412,7 +400,7 @@ export default function AssetsPage() {
           {assetIcons[category] ? React.cloneElement(assetIcons[category] as React.ReactElement, { className: "h-5 w-5 text-muted-foreground" }) : <Coins className="h-5 w-5 text-muted-foreground" />}
           </CardHeader>
           <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
-          {Object.keys(categorySpecificTotals).length === 0 && assetsForThisCategory.length === 0 && <p className="text-muted-foreground text-sm">No assets in this category. Add one using the "Add Asset" button.</p>}
+          {Object.keys(categorySpecificTotals).length === 0 && assetsForThisCategory.length === 0 && <p className="text-muted-foreground text-sm">No assets in this category. Add one using the "Add Asset\" button.</p>}
           {Object.entries(categorySpecificTotals).map(([currency, totalData]) => {
               const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
                   ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100
@@ -488,7 +476,7 @@ export default function AssetsPage() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Asset Portfolio</h1>
+          <h1 className="text-xl sm:text-2xl md: text-3xl font-bold tracking-tight">Asset Portfolio</h1>
           <p className="text-muted-foreground text-xs sm:text-sm">
             {activeTab === 'overview' ? 'Your financial asset overview.' : `Manage your ${categoryDisplayNames[activeTab].toLowerCase()}.`}
           </p>
@@ -615,14 +603,14 @@ export default function AssetsPage() {
         <div className="relative mt-2"> 
             <AnimatePresence mode="wait">
               {activeTab === 'overview' && isMounted && (
-                <TabsContent key="overview" value="overview" forceMount={true} className="w-full">
+                <TabsContent key="overview\" value="overview\" forceMount={true} className="w-full">
                   {renderOverviewContent()}
                 </TabsContent>
               )}
               {activeTab !== 'overview' && isMounted && (
                  <TabsContent key={activeTab} value={activeTab} forceMount={true} className="w-full">
                     {activeTab !== 'overview' && (
-                      <Button variant="outline" size="sm" onClick={() => handleTabChange('overview')} className="mb-4 text-xs sm:text-sm">
+                      <Button variant="outline\" size="sm\" onClick={() => handleTabChange('overview')} className="mb-4 text-xs sm:text-sm">
                           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Overview
                       </Button>
                     )}
@@ -636,4 +624,3 @@ export default function AssetsPage() {
     </div>
   );
 }
-    
