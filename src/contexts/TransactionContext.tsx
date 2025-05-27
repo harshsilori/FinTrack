@@ -17,6 +17,7 @@ interface TransactionContextType {
   transactions: Transaction[];
   addTransactionBatch: (newTransactions: Omit<Transaction, 'id'>[]) => void;
   deleteTransaction: (transactionId: string) => void;
+  updateTransaction: (updatedTransaction: Transaction) => void; // New method
   getTransactionsByMonth: (year: number, month: number) // 1-indexed month
     => Transaction[];
 }
@@ -30,7 +31,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     { id: 't3', date: new Date().toISOString().split('T')[0], description: 'Coffee with a friend', amount: 12.00, type: 'expense', category: 'Dining Out' },
     { id: 't4', date: new Date(new Date().setDate(new Date().getDate() - 5)).toISOString().split('T')[0], description: 'Electricity Bill', amount: 120.00, type: 'expense', category: 'Utilities' },
     { id: 't5', date: new Date(new Date(new Date().setMonth(new Date().getMonth() - 1)).setDate(15)).toISOString().split('T')[0], description: 'Old Internet Bill', amount: 60.00, type: 'expense', category: 'Utilities' },
-  ]);
+  ].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
   const addTransactionBatch = useCallback((newTransactionsData: Omit<Transaction, 'id'>[]) => {
     const fullNewTransactions: Transaction[] = newTransactionsData.map((txData, index) => ({
@@ -44,6 +45,14 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     setTransactions((prevTransactions) => prevTransactions.filter((tx) => tx.id !== transactionId));
   }, []);
 
+  const updateTransaction = useCallback((updatedTransaction: Transaction) => {
+    setTransactions((prevTransactions) =>
+      prevTransactions.map((tx) =>
+        tx.id === updatedTransaction.id ? updatedTransaction : tx
+      ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    );
+  }, []);
+
   const getTransactionsByMonth = useCallback((year: number, month: number) => {
     return transactions.filter(tx => {
       const txDate = new Date(tx.date);
@@ -53,7 +62,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <TransactionContext.Provider value={{ transactions, addTransactionBatch, deleteTransaction, getTransactionsByMonth }}>
+    <TransactionContext.Provider value={{ transactions, addTransactionBatch, deleteTransaction, updateTransaction, getTransactionsByMonth }}>
       {children}
     </TransactionContext.Provider>
   );

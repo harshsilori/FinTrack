@@ -1,16 +1,17 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Trash2, Save, Upload, Camera, AlertTriangle } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { PlusCircle, Trash2, Save, Upload, Camera, AlertTriangle, Edit3 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { useTransactions, type Transaction } from '@/contexts/TransactionContext'; // Import from context
+import { useTransactions, type Transaction } from '@/contexts/TransactionContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
@@ -31,15 +32,28 @@ const initialFormTransactionRow: Omit<FormTransaction, 'id'> = {
   category: '',
 };
 
+const initialEditFormState: Transaction = {
+  id: '',
+  date: '',
+  description: '',
+  amount: 0,
+  type: 'expense',
+  category: '',
+};
+
 export default function TransactionsPage() {
   const { toast } = useToast();
-  const { transactions: savedTransactions, addTransactionBatch, deleteTransaction } = useTransactions();
+  const { transactions: savedTransactions, addTransactionBatch, deleteTransaction, updateTransaction } = useTransactions();
   
   const [formTransactions, setFormTransactions] = useState<FormTransaction[]>([
     { ...initialFormTransactionRow, id: Date.now().toString() },
   ]);
 
-  const categories = useMemo(() => ['Groceries', 'Utilities', 'Salary', 'Entertainment', 'Transport', 'Healthcare', 'Education', 'Dining Out', 'Shopping', 'Rent/Mortgage', 'Investment', 'Gifts', 'Other'], []);
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
+  const [currentTransactionForEdit, setCurrentTransactionForEdit] = useState<Transaction>(initialEditFormState);
+
+
+  const categories = useMemo(() => ['Groceries', 'Utilities', 'Salary', 'Entertainment', 'Transport', 'Healthcare', 'Education', 'Dining Out', 'Shopping', 'Rent/Mortgage', 'Investment', 'Gifts', 'Other'].sort(), []);
 
   const handleInputChange = (id: string, field: keyof Omit<FormTransaction, 'id' | 'type'>, value: string) => {
     setFormTransactions(
@@ -52,7 +66,7 @@ export default function TransactionsPage() {
   const handleTypeChange = (id: string, value: 'income' | 'expense') => {
     setFormTransactions(
       formTransactions.map((tx) =>
-        tx.id === id ? { ...tx, type: value, category: tx.type === value ? tx.category : '' } : tx // Reset category if type changes, for simplicity
+        tx.id === id ? { ...tx, type: value, category: tx.type === value ? tx.category : '' } : tx
       )
     );
   };
@@ -76,7 +90,7 @@ export default function TransactionsPage() {
     }
   };
 
-  const handleSaveAll = () => {
+  const handleSaveAllBatch = () => {
     const validTransactionsToSave: Omit<Transaction, 'id'>[] = [];
     let hasError = false;
 
@@ -122,9 +136,38 @@ export default function TransactionsPage() {
       title: "Transactions Saved",
       description: `${validTransactionsToSave.length} transaction(s) have been saved successfully.`,
     });
-    // Reset to one empty row after saving
     setFormTransactions([{ ...initialFormTransactionRow, id: Date.now().toString() }]);
   };
+
+  const openEditForm = (transaction: Transaction) => {
+    setCurrentTransactionForEdit(transaction);
+    setIsEditFormOpen(true);
+  };
+
+  const handleEditFormChange = (field: keyof Omit<Transaction, 'id'>, value: string | number | 'income' | 'expense') => {
+    setCurrentTransactionForEdit(prev => ({
+        ...prev!,
+        [field]: field === 'amount' ? parseFloat(value as string) || 0 : value,
+    }));
+  };
+  
+  const handleSaveEditedTransaction = () => {
+    if (!currentTransactionForEdit) return;
+
+    if (!currentTransactionForEdit.description || !currentTransactionForEdit.date || !currentTransactionForEdit.category || currentTransactionForEdit.amount <= 0) {
+        toast({
+            title: "Validation Error",
+            description: "Please fill all fields correctly. Amount must be a positive number.",
+            variant: "destructive",
+        });
+        return;
+    }
+    updateTransaction(currentTransactionForEdit);
+    toast({ title: "Transaction Updated", description: `${currentTransactionForEdit.description} has been updated.` });
+    setIsEditFormOpen(false);
+    setCurrentTransactionForEdit(initialEditFormState);
+  };
+
 
   const handleImportPlaceholder = (featureName: string) => {
     toast({
@@ -135,7 +178,6 @@ export default function TransactionsPage() {
   };
   
   const formatCurrency = (value: number, currencyCode = 'USD') => {
-    // This is a placeholder. Ideally, currency would come from user settings.
     return value.toLocaleString(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
@@ -242,11 +284,68 @@ export default function TransactionsPage() {
           </Button>
         </CardContent>
         <CardFooter>
-          <Button onClick={handleSaveAll} className="w-full md:w-auto">
+          <Button onClick={handleSaveAllBatch} className="w-full md:w-auto">
             <Save className="mr-2 h-4 w-4" /> Save Entered Transactions
           </Button>
         </CardFooter>
       </Card>
+
+      {/* Edit Transaction Dialog */}
+      <Dialog open={isEditFormOpen} onOpenChange={(isOpen) => {
+          setIsEditFormOpen(isOpen);
+          if (!isOpen) setCurrentTransactionForEdit(initialEditFormState);
+      }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Edit Transaction</DialogTitle>
+            <DialogDescription>
+              Modify the details of your transaction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-date" className="text-right">Date</Label>
+              <Input id="edit-date" type="date" value={currentTransactionForEdit.date} onChange={(e) => handleEditFormChange('date', e.target.value)} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-description" className="text-right">Description</Label>
+              <Input id="edit-description" value={currentTransactionForEdit.description} onChange={(e) => handleEditFormChange('description', e.target.value)} className="col-span-3" placeholder="e.g., Lunch meeting" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-amount" className="text-right">Amount</Label>
+              <Input id="edit-amount" type="number" value={currentTransactionForEdit.amount.toString()} onChange={(e) => handleEditFormChange('amount', e.target.value)} className="col-span-3" placeholder="0.00" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-type" className="text-right">Type</Label>
+              <Select value={currentTransactionForEdit.type} onValueChange={(value: 'income' | 'expense') => handleEditFormChange('type', value)}>
+                <SelectTrigger id="edit-type" className="col-span-3">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="expense">Expense</SelectItem>
+                  <SelectItem value="income">Income</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-category" className="text-right">Category</Label>
+              <Select value={currentTransactionForEdit.category} onValueChange={(value) => handleEditFormChange('category', value)}>
+                <SelectTrigger id="edit-category" className="col-span-3">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsEditFormOpen(false)}>Cancel</Button>
+            <Button type="submit" onClick={handleSaveEditedTransaction}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <Card className="rounded-2xl shadow-lg">
         <CardHeader>
@@ -275,16 +374,19 @@ export default function TransactionsPage() {
                     <TableBody>
                         {savedTransactions.map((tx) => (
                             <TableRow key={tx.id}>
-                                <TableCell>{new Date(tx.date).toLocaleDateString()}</TableCell>
+                                <TableCell>{new Date(tx.date + 'T00:00:00').toLocaleDateString()}</TableCell> {/* Ensure date is parsed as local */}
                                 <TableCell className="font-medium">{tx.description}</TableCell>
                                 <TableCell>{tx.category}</TableCell>
-                                <TableCell className={`capitalize ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                                <TableCell className={`capitalize ${tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                     {tx.type}
                                 </TableCell>
-                                <TableCell className={`text-right font-semibold ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                                <TableCell className={`text-right font-semibold ${tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                    {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
                                 </TableCell>
-                                <TableCell className="text-center">
+                                <TableCell className="text-center space-x-1">
+                                     <Button variant="ghost" size="icon" aria-label="Edit transaction" onClick={() => openEditForm(tx)}>
+                                        <Edit3 className="h-4 w-4" />
+                                     </Button>
                                      <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                             <Button variant="ghost" size="icon" aria-label="Delete transaction">
