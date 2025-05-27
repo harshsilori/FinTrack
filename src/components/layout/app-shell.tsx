@@ -17,14 +17,38 @@ import { SiteHeader } from '@/components/layout/site-header';
 import { MainNav } from '@/components/layout/main-nav';
 import { NAV_LINKS, BOTTOM_NAV_LINKS } from '@/constants/nav-links';
 import Link from 'next/link';
+import { OnboardingModal } from '@/components/onboarding/onboarding-modal'; // Import OnboardingModal
+
+const ONBOARDING_COMPLETED_KEY = 'hasCompletedFinTrackOnboarding';
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
+    try {
+      const hasCompleted = localStorage.getItem(ONBOARDING_COMPLETED_KEY);
+      if (hasCompleted !== 'true') {
+        setShowOnboarding(true);
+      }
+    } catch (error) {
+      // localStorage might not be available (e.g. in SSR or if disabled)
+      console.warn('localStorage not available for onboarding check.');
+      // Decide on fallback behavior: show onboarding or not?
+      // For now, let's default to not showing it if localStorage fails.
+    }
   }, []);
+
+  const handleOnboardingComplete = () => {
+    try {
+      localStorage.setItem(ONBOARDING_COMPLETED_KEY, 'true');
+    } catch (error) {
+       console.warn('localStorage not available for setting onboarding flag.');
+    }
+    setShowOnboarding(false);
+  };
 
   return (
     <SidebarProvider defaultOpen>
@@ -73,24 +97,24 @@ export function AppShell({ children }: { children: ReactNode }) {
       </Sidebar>
       <SidebarInset className="flex flex-col">
         <SiteHeader />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8"> {/* Removed relative class as overlay is gone */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {isMounted ? (
             <AnimatePresence mode="wait">
               <motion.div
-                key={pathname} // Keyed by pathname for page transitions
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
+                key={pathname}
+                initial={{ opacity: 0, x: -30 }} // Changed for more noticeable animation
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 30 }} // Changed for more noticeable animation
+                transition={{ duration: 0.25, ease: "easeInOut" }} // Slightly faster
               >
                 {children}
               </motion.div>
             </AnimatePresence>
           ) : (
-            // Render children directly on server and initial client render to prevent hydration mismatch
-            <>{children}</> 
+             <>{children}</> // Render children directly on server and initial client render
           )}
         </main>
+        {isMounted && <OnboardingModal isOpen={showOnboarding} onComplete={handleOnboardingComplete} />}
       </SidebarInset>
     </SidebarProvider>
   );
