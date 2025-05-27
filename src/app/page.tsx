@@ -6,25 +6,26 @@ import type { AssetCategory } from "@/contexts/AssetContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Bitcoin, Landmark, BarChartBig, WalletCards, TrendingUp, DollarSign, PiggyBank, Building2, AlertTriangle, Target, Plane, ShieldCheck, AreaChart, PieChart as PieChartIcon } from "lucide-react";
+import { Bitcoin, Landmark, BarChartBig, WalletCards, TrendingUp, DollarSign, PiggyBank, Building2, AlertTriangle, Target, Plane, ShieldCheck, AreaChart, PieChart as PieChartIcon, Info } from "lucide-react";
 import Link from "next/link";
 import Image from 'next/image';
 import { useAssets } from "@/contexts/AssetContext";
 import { useGoals } from "@/contexts/GoalContext";
-import { useTransactions, type Transaction } from "@/contexts/TransactionContext"; // Import useTransactions
+import { useTransactions, type Transaction } from "@/contexts/TransactionContext";
 import type { Asset } from "@/contexts/AssetContext";
 import type { Goal } from "@/contexts/GoalContext";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
 
-const categoryIcons: Record<AssetCategory | 'total', React.ReactNode> = {
+const categoryIcons: Record<AssetCategory | 'total' | 'allocation', React.ReactNode> = {
   crypto: <Bitcoin className="h-6 w-6 text-orange-500" />,
   stock: <BarChartBig className="h-6 w-6 text-green-500" />,
   mutualfund: <WalletCards className="h-6 w-6 text-indigo-500" />,
   bank: <Landmark className="h-6 w-6 text-blue-500" />,
   property: <Building2 className="h-6 w-6 text-purple-500" />,
-  total: <DollarSign className="h-6 w-6 text-primary" />
+  total: <DollarSign className="h-6 w-6 text-primary" />,
+  allocation: <PieChartIcon className="h-6 w-6 text-teal-500" />
 };
 
 const goalDisplayIcons: Record<string, React.ReactNode> = {
@@ -44,15 +45,31 @@ interface CategorySummary {
 }
 
 const PREDEFINED_COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-  'hsl(200 70% 50%)', // Additional distinct colors
-  'hsl(300 70% 50%)',
-  'hsl(50 70% 50%)',
+  'hsl(var(--chart-1))', // primary
+  'hsl(var(--chart-2))', // accent
+  'hsl(var(--chart-3))', // blue-ish
+  'hsl(var(--chart-4))', // purple-ish
+  'hsl(var(--chart-5))', // pink-ish
+  'hsl(35, 92%, 58%)',   // orange
+  'hsl(120, 70%, 40%)',  // green
+  'hsl(190, 80%, 55%)',  // teal
 ];
+
+// Helper for pie chart label rendering
+const RADIAN = Math.PI / 180;
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }: any) => {
+  if (percent * 100 < 5) return null; // Don't render label for very small slices
+
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-xs font-medium">
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
 
 
 export default function HomePage() {
@@ -111,7 +128,7 @@ export default function HomePage() {
   
   const orderedCategories: AssetCategory[] = ['stock', 'crypto', 'mutualfund', 'bank', 'property'];
 
-  // Monthly Overview Data
+  // Data for Monthly Expense Overview Pie Chart
   const currentMonth = new Date().getMonth() + 1; // 1-indexed
   const currentYear = new Date().getFullYear();
   const monthlyTransactions = getTransactionsByMonth(currentYear, currentMonth);
@@ -123,13 +140,13 @@ export default function HomePage() {
       return acc;
     }, {} as Record<string, number>);
 
-  const pieChartData = Object.entries(monthlyExpensesByCategory)
+  const monthlyExpensePieChartData = Object.entries(monthlyExpensesByCategory)
     .map(([name, value], index) => ({
       name,
       value,
       fill: PREDEFINED_COLORS[index % PREDEFINED_COLORS.length],
     }))
-    .sort((a, b) => b.value - a.value); // Sort for consistent color assignment if categories change
+    .sort((a, b) => b.value - a.value);
 
   const totalMonthlyIncome = monthlyTransactions
     .filter(tx => tx.type === 'income')
@@ -138,6 +155,38 @@ export default function HomePage() {
   const totalMonthlyExpenses = monthlyTransactions
     .filter(tx => tx.type === 'expense')
     .reduce((sum, tx) => sum + tx.amount, 0);
+
+  // Data for Asset Allocation Pie Chart
+  const assetAllocationData: { name: string, value: number, currency?: string }[] = [];
+  const aggregatedValuesByCat: Record<string, number> = {};
+  const currenciesPresentInAllocation = new Set<string>();
+
+  assets.forEach(asset => {
+    const marketValue = getAssetMarketValue(asset);
+    const categoryName = categoryDisplayNames[asset.category] || asset.category;
+    aggregatedValuesByCat[categoryName] = (aggregatedValuesByCat[categoryName] || 0) + marketValue;
+    currenciesPresentInAllocation.add(asset.currency);
+  });
+
+  let totalPortfolioValueForAllocation = 0;
+  Object.entries(aggregatedValuesByCat).forEach(([name, value], index) => {
+    if (value > 0) { // Only include categories with value
+      assetAllocationData.push({
+        name: name,
+        value: value,
+      });
+      totalPortfolioValueForAllocation += value;
+    }
+  });
+  // Sort for consistent color assignment
+  assetAllocationData.sort((a,b) => b.value - a.value); 
+  // Assign fill colors after sorting
+  assetAllocationData.forEach((item, index) => {
+    (item as any).fill = PREDEFINED_COLORS[index % PREDEFINED_COLORS.length];
+  });
+
+
+  const isMixedCurrencyAllocation = currenciesPresentInAllocation.size > 1;
 
 
   return (
@@ -187,10 +236,68 @@ export default function HomePage() {
         </Card>
       )}
 
+      {/* Asset Allocation Pie Chart */}
+      {assetAllocationData.length > 0 && (
+        <Card className="rounded-2xl shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg sm:text-xl">Asset Allocation</CardTitle>
+            {categoryIcons['allocation']}
+          </CardHeader>
+          <CardContent>
+            {isMixedCurrencyAllocation && (
+              <div className="mb-2 text-xs text-muted-foreground flex items-center gap-1 p-2 bg-muted/50 rounded-md">
+                <Info className="h-4 w-4 text-primary shrink-0" />
+                <span>Note: This chart sums numerical values of assets in different currencies without conversion. For precise allocation with multiple currencies, consider a single currency view or future conversion features.</span>
+              </div>
+            )}
+            <ChartContainer config={{}} className="aspect-video h-[250px] w-full sm:h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                  <RechartsTooltip
+                    contentStyle={{ borderRadius: "0.5rem", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)"}}
+                    formatter={(value: number, name: string) => {
+                       const percentage = totalPortfolioValueForAllocation > 0 ? (value / totalPortfolioValueForAllocation) * 100 : 0;
+                       // If mixed currencies, just show value. If single, format it.
+                       const displayValue = currenciesPresentInAllocation.size > 1 
+                                            ? value.toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0}) 
+                                            : formatCurrency(value, Array.from(currenciesPresentInAllocation)[0] || 'USD');
+                       return [`${displayValue} (${percentage.toFixed(1)}%)`, name];
+                    }}
+                  />
+                  <Pie
+                    data={assetAllocationData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    labelLine={false}
+                    label={renderCustomizedLabel}
+                  >
+                    {assetAllocationData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={(entry as any).fill} stroke="hsl(var(--background))" strokeWidth={2}/>
+                    ))}
+                  </Pie>
+                  <Legend 
+                    iconSize={10} 
+                    layout="horizontal" 
+                    verticalAlign="bottom" 
+                    align="center"
+                    wrapperStyle={{paddingTop: "10px"}}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+             <p className="text-xs text-muted-foreground text-center pt-2">Showing allocation of total portfolio value by asset category.</p>
+          </CardContent>
+        </Card>
+      )}
+
+
       {Object.entries(categorySummariesByCurrency).map(([currency, summaries]) => (
         <div key={currency} className="space-y-6">
           {Object.keys(portfolioTotalsByCurrency).length > 1 && (
-            <h2 className="text-2xl font-semibold tracking-tight mt-6 border-b pb-2">Assets in {currency}</h2>
+            <h2 className="text-2xl font-semibold tracking-tight mt-6 border-b pb-2">Asset Summaries ({currency})</h2>
           )}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {orderedCategories.map((category) => {
@@ -257,7 +364,7 @@ export default function HomePage() {
                 <p className="text-lg font-semibold text-red-600">{formatCurrency(totalMonthlyExpenses)}</p>
               </div>
             </div>
-            {pieChartData.length > 0 ? (
+            {monthlyExpensePieChartData.length > 0 ? (
               <ChartContainer config={{}} className="aspect-square h-[200px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -265,21 +372,23 @@ export default function HomePage() {
                       contentStyle={{ borderRadius: "0.5rem", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)"}}
                       formatter={(value: number, name: string, props) => [`${formatCurrency(value)} (${((value / totalMonthlyExpenses) * 100).toFixed(1)}%)`, name]}
                     />
-                    <Pie data={pieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} labelLine={false}
+                    <Pie data={monthlyExpensePieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} labelLine={false}
                          label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
                             const RADIAN = Math.PI / 180;
-                            const radius = innerRadius + (outerRadius - innerRadius) * 1.2; // Position label outside
+                            const radius = innerRadius + (outerRadius - innerRadius) * 1.2; 
                             const x = cx + radius * Math.cos(-midAngle * RADIAN);
                             const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                            return ( (percent*100) > 5 && // Only show label if percent > 5%
+                            const showLabel = (percent*100) > 5;
+                            if(!showLabel) return null;
+                            return (
                                 <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs">
                                     {name} ({(percent * 100).toFixed(0)}%)
                                 </text>
                             );
                         }}
                     >
-                      {pieChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      {monthlyExpensePieChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={2}/>
                       ))}
                     </Pie>
                   </PieChart>
@@ -373,11 +482,11 @@ export default function HomePage() {
   );
 }
 
-// Need to define categoryDisplayNames if it's used in CardFooter for View All button
-const categoryDisplayNames: Record<AssetCategory, string> = {
+const categoryDisplayNames: Record<AssetCategory | string, string> = {
   bank: "Bank Accounts",
   stock: "Stocks",
   crypto: "Cryptocurrencies",
   property: "Properties",
   mutualfund: "Mutual Funds",
 };
+
