@@ -1,5 +1,6 @@
+
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, ArrowLeftRight, Wallet, BarChart3, Lightbulb, Settings, PiggyBank, Target } from 'lucide-react'; // Added Target
+import { LayoutDashboard, ArrowLeftRight, Wallet, Lightbulb, Settings, PiggyBank, Target, AreaChart } from 'lucide-react'; // Added AreaChart
 
 export interface NavLink {
   href: string;
@@ -31,9 +32,14 @@ export const NAV_LINKS: NavLink[] = [
     icon: PiggyBank,
   },
   {
-    href: '/goals', // New Goals link
+    href: '/goals',
     label: 'Goals',
     icon: Target,
+  },
+  {
+    href: '/reports', // New Reports link
+    label: 'Reports',
+    icon: AreaChart,
   },
   {
     href: '/insights',
