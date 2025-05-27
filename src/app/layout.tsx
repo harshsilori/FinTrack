@@ -4,7 +4,8 @@ import { Roboto } from 'next/font/google';
 import './globals.css';
 import { AppShell } from '@/components/layout/app-shell';
 import { Toaster } from "@/components/ui/toaster";
-import { AssetProvider } from '@/contexts/AssetContext'; // Import AssetProvider
+import { AssetProvider } from '@/contexts/AssetContext';
+import { GoalProvider } from '@/contexts/GoalContext'; // Import GoalProvider
 
 const roboto = Roboto({
   weight: ['300', '400', '500', '700'],
@@ -26,10 +27,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${roboto.variable} font-sans antialiased`}>
-        <AssetProvider> {/* Wrap AppShell and children with AssetProvider */}
-          <AppShell>
-            {children}
-          </AppShell>
+        <AssetProvider>
+          <GoalProvider> {/* Wrap with GoalProvider */}
+            <AppShell>
+              {children}
+            </AppShell>
+          </GoalProvider>
         </AssetProvider>
         <Toaster />
       </body>
