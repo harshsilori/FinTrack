@@ -12,8 +12,18 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { PlusCircle, Trash2, Save, Upload, Camera, AlertTriangle, Edit3, FilterX, Search as SearchIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useTransactions, type Transaction } from '@/contexts/TransactionContext';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { parseISO, isValid, format } from 'date-fns';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle,
+  AlertDialogTrigger, // Added missing import
+} from '@/components/ui/alert-dialog';
+import { parseISO, isValid, format, startOfMonth, endOfMonth } from 'date-fns';
 
 const generateClientUniqueId = () => Math.random().toString(36).substring(2, 11);
 
@@ -44,8 +54,8 @@ const initialEditFormState: Transaction = {
 };
 
 const defaultFilterState = {
-  startDate: '',
-  endDate: '',
+  startDate: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+  endDate: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
   type: 'all',
   category: 'all',
   searchTerm: '',
@@ -223,16 +233,27 @@ export default function TransactionsPage() {
 
   const filteredTransactions = useMemo(() => {
     return savedTransactions.filter(tx => {
-      const txDate = parseISO(tx.date);
+      let txDate;
+      try {
+        txDate = parseISO(tx.date);
+        if (!isValid(txDate)) throw new Error("Invalid date");
+      } catch (e) {
+        console.error("Error parsing transaction date for filtering:", tx.date, e);
+        return false; 
+      }
       
       let isAfterStartDate = true;
       if (filterStartDate && isValid(parseISO(filterStartDate))) {
-        isAfterStartDate = txDate >= parseISO(filterStartDate);
+        try {
+          isAfterStartDate = txDate >= parseISO(filterStartDate);
+        } catch (e) { isAfterStartDate = false; }
       }
       
       let isBeforeEndDate = true;
       if (filterEndDate && isValid(parseISO(filterEndDate))) {
-        isBeforeEndDate = txDate <= parseISO(filterEndDate);
+         try {
+          isBeforeEndDate = txDate <= parseISO(filterEndDate);
+        } catch (e) { isBeforeEndDate = false; }
       }
       
       const matchesType = filterType === 'all' || tx.type === filterType;
@@ -492,7 +513,7 @@ export default function TransactionsPage() {
             <CardTitle className="text-base sm:text-lg md:text-xl">All Transactions</CardTitle>
             <CardDescription className="text-xs sm:text-sm">A log of all your recorded income and expenses. Use filters above to narrow down the list.</CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0"> {/* Removed horizontal padding on card content for table */}
+        <CardContent className="overflow-x-auto p-0">
             {filteredTransactions.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8 px-4">
                     <AlertTriangle className="mx-auto h-10 w-10 sm:h-12 sm:w-12 mb-4 text-primary" />
@@ -514,8 +535,12 @@ export default function TransactionsPage() {
                     <TableBody>
                         {filteredTransactions.map((tx) => {
                             let displayDate = "Invalid Date";
-                            if (tx.date && isValid(parseISO(tx.date))) {
-                                displayDate = format(parseISO(tx.date), "P");
+                            try {
+                              if (tx.date && isValid(parseISO(tx.date))) {
+                                  displayDate = format(parseISO(tx.date), "P");
+                              }
+                            } catch (e) {
+                              console.error("Error formatting date for display:", tx.date, e);
                             }
                             return (
                                 <TableRow key={tx.id}>
@@ -565,5 +590,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
-    
