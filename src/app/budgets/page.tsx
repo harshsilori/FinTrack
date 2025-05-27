@@ -12,28 +12,11 @@ import { Progress } from '@/components/ui/progress';
 import { PlusCircle, Edit3, Trash2, PiggyBank } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useTransactions, type Transaction } from '@/contexts/TransactionContext';
+import { useBudgets, type Budget, budgetPeriods, budgetCategories } from '@/contexts/BudgetContext'; // Import from BudgetContext
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 
-interface Budget {
-  id: string;
-  name: string;
-  amount: number;
-  // spent: number; // Removed: This will be calculated
-  category: string;
-  period: 'monthly' | 'bi-weekly' | 'weekly' | 'custom';
-  customPeriodDetails?: string; // e.g., "Jan 1 - Jan 15"
-}
 
-const budgetPeriods = [
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'bi-weekly', label: 'Bi-Weekly (Manual Tracking)' }, // Updated label
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'custom', label: 'Custom (Manual Tracking)' }, // Updated label
-];
-
-const budgetCategories = ['Groceries', 'Dining Out', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Other'];
-
-const BudgetCard = ({ 
+const BudgetCard = React.memo(({ 
   budget, 
   onEdit, 
   onDelete,
@@ -56,23 +39,25 @@ const BudgetCard = ({
     if (budget.period === 'monthly') {
       interval = { start: startOfMonth(today), end: endOfMonth(today) };
     } else if (budget.period === 'weekly') {
-      interval = { start: startOfWeek(today, { weekStartsOn: 1 }), end: endOfWeek(today, { weekStartsOn: 1 }) }; // Assuming week starts on Monday
+      interval = { start: startOfWeek(today, { weekStartsOn: 1 }), end: endOfWeek(today, { weekStartsOn: 1 }) }; 
     } else {
-      // For bi-weekly and custom, we currently don't have enough info for auto-calculation
       setIsComplexPeriod(true);
-      // If you had a 'spent' field previously and want to show it as a fallback:
-      // spent = budget.spent || 0; // budget.spent doesn't exist anymore. Default to 0 or handle differently.
-      setCalculatedSpent(0); // Or a placeholder like -1 to indicate manual tracking
+      setCalculatedSpent(0); 
       return;
     }
     setIsComplexPeriod(false);
 
     if (interval) {
       const relevantTransactions = transactions.filter(tx => {
-        const txDate = parseISO(tx.date); // Assuming tx.date is 'YYYY-MM-DD'
-        return tx.type === 'expense' && 
-               tx.category === budget.category && 
-               isWithinInterval(txDate, interval!);
+        try {
+          const txDate = parseISO(tx.date); 
+          return tx.type === 'expense' && 
+                 tx.category === budget.category && 
+                 isWithinInterval(txDate, interval!);
+        } catch (e) {
+          console.error("Error parsing transaction date for budget calculation:", tx.date, e);
+          return false;
+        }
       });
       spent = relevantTransactions.reduce((sum, tx) => sum + tx.amount, 0);
     }
@@ -82,7 +67,7 @@ const BudgetCard = ({
   const spentPercentage = budget.amount > 0 ? Math.min((calculatedSpent / budget.amount) * 100, 100) : 0;
   
   const getProgressColor = (percentage: number) => {
-    if (isComplexPeriod) return 'bg-gray-400'; // Indicate manual tracking
+    if (isComplexPeriod) return 'bg-gray-400'; 
     if (percentage > 90) return 'bg-red-500';
     if (percentage > 70) return 'bg-yellow-500';
     return 'bg-green-500';
@@ -128,19 +113,15 @@ const BudgetCard = ({
       </CardFooter>
     </Card>
   );
-};
+});
 BudgetCard.displayName = 'BudgetCard';
 
 
 export default function BudgetsPage() {
   const { toast } = useToast();
-  const { transactions } = useTransactions(); // Get transactions from context
+  const { transactions } = useTransactions(); 
+  const { budgets, addBudget, updateBudget, deleteBudget: deleteBudgetFromContext } = useBudgets(); // Use context
 
-  const [budgets, setBudgets] = useState<Budget[]>([
-    { id: '1', name: 'Monthly Groceries', amount: 400, category: 'Groceries', period: 'monthly' },
-    { id: '2', name: 'Entertainment Fund', amount: 200, category: 'Entertainment', period: 'monthly' },
-    { id: '3', name: 'Weekly Transport', amount: 100, category: 'Transport', period: 'weekly' },
-  ]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentBudget, setCurrentBudget] = useState<Partial<Budget> | null>(null);
 
@@ -159,24 +140,21 @@ export default function BudgetsPage() {
       return;
     }
 
-    // Remove 'spent' from the budget object being saved
-    const { ...budgetDataToSave } = currentBudget;
-
+    const budgetDataToSave = { ...currentBudget };
 
     if (budgetDataToSave.id) {
-      setBudgets(budgets.map(b => b.id === budgetDataToSave.id ? budgetDataToSave as Budget : b));
+      updateBudget(budgetDataToSave as Budget); // Use context update
       toast({ title: "Budget Updated", description: `${budgetDataToSave.name} has been updated.`});
     } else {
-      const newBudget = { ...budgetDataToSave, id: Date.now().toString() } as Budget;
-      setBudgets([...budgets, newBudget]);
-      toast({ title: "Budget Added", description: `${newBudget.name} has been added.`});
+      addBudget(budgetDataToSave as Omit<Budget, 'id'>); // Use context add
+      toast({ title: "Budget Added", description: `${budgetDataToSave.name} has been added.`});
     }
     setIsFormOpen(false);
     setCurrentBudget(null);
   };
 
   const handleDeleteBudget = (id: string) => {
-    setBudgets(budgets.filter(b => b.id !== id));
+    deleteBudgetFromContext(id); // Use context delete
     toast({ title: "Budget Deleted", description: `Budget has been removed.`, variant: "destructive"});
   };
   

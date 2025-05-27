@@ -7,7 +7,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { AssetProvider } from '@/contexts/AssetContext';
 import { GoalProvider } from '@/contexts/GoalContext';
 import { TransactionProvider } from '@/contexts/TransactionContext';
-import { DebtProvider } from '@/contexts/DebtContext'; // Import DebtProvider
+import { DebtProvider } from '@/contexts/DebtContext';
+import { BudgetProvider } from '@/contexts/BudgetContext'; // Import BudgetProvider
 import Script from 'next/script';
 
 
@@ -52,10 +53,12 @@ export default function RootLayout({
         <AssetProvider>
           <GoalProvider>
             <TransactionProvider>
-              <DebtProvider> {/* Wrap with DebtProvider */}
-                <AppShell>
-                  {children}
-                </AppShell>
+              <DebtProvider>
+                <BudgetProvider> {/* Wrap with BudgetProvider */}
+                  <AppShell>
+                    {children}
+                  </AppShell>
+                </BudgetProvider>
               </DebtProvider>
             </TransactionProvider>
           </GoalProvider>

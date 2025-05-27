@@ -9,8 +9,8 @@ export interface Goal {
   name: string;
   targetAmount: number;
   currentAmount: number;
-  targetDate?: string; // Optional, e.g., 'YYYY-MM-DD'
-  icon?: string; // Optional, for a Lucide icon name or emoji
+  targetDate?: string; 
+  icon?: string; 
 }
 
 interface GoalContextType {
@@ -19,12 +19,12 @@ interface GoalContextType {
   updateGoal: (updatedGoal: Goal) => void;
   deleteGoal: (goalId: string) => void;
   addContribution: (goalId: string, amount: number) => void;
+  replaceAllGoals: (newGoals: Goal[]) => void; // New function
 }
 
 const GoalContext = createContext<GoalContextType | undefined>(undefined);
 
-export const GoalProvider = ({ children }: { children: ReactNode }) => {
-  const [goals, setGoals] = useState<Goal[]>([
+const initialSampleGoals: Goal[] = [
     {
       id: 'goal1',
       name: 'Emergency Fund',
@@ -41,7 +41,10 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
       targetDate: '2025-06-01',
       icon: 'Plane',
     },
-  ]);
+];
+
+export const GoalProvider = ({ children }: { children: ReactNode }) => {
+  const [goals, setGoals] = useState<Goal[]>(initialSampleGoals);
 
   const addGoal = useCallback((newGoalData: Omit<Goal, 'id'>) => {
     const fullNewGoal: Goal = {
@@ -65,14 +68,18 @@ export const GoalProvider = ({ children }: { children: ReactNode }) => {
     setGoals((prevGoals) =>
       prevGoals.map((g) =>
         g.id === goalId
-          ? { ...g, currentAmount: Math.min(g.currentAmount + amount, g.targetAmount) } // Cap at targetAmount
+          ? { ...g, currentAmount: Math.min(g.currentAmount + amount, g.targetAmount) } 
           : g
       )
     );
   }, []);
 
+  const replaceAllGoals = useCallback((newGoals: Goal[]) => {
+    setGoals(newGoals);
+  }, []);
+
   return (
-    <GoalContext.Provider value={{ goals, addGoal, updateGoal, deleteGoal, addContribution }}>
+    <GoalContext.Provider value={{ goals, addGoal, updateGoal, deleteGoal, addContribution, replaceAllGoals }}>
       {children}
     </GoalContext.Provider>
   );

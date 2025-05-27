@@ -7,10 +7,10 @@ import React, { createContext, useState, useContext, useCallback } from 'react';
 export interface Debt {
   id: string;
   name: string;
-  totalAmount: number; // Initial total amount of the debt
-  amountPaid: number;  // Amount paid off so far
-  interestRate?: number; // Optional annual interest rate in percentage
-  minimumPayment?: number; // Optional minimum monthly payment
+  totalAmount: number; 
+  amountPaid: number;  
+  interestRate?: number; 
+  minimumPayment?: number; 
 }
 
 interface DebtContextType {
@@ -19,12 +19,12 @@ interface DebtContextType {
   updateDebt: (updatedDebt: Debt) => void;
   deleteDebt: (debtId: string) => void;
   makePayment: (debtId: string, paymentAmount: number) => void;
+  replaceAllDebts: (newDebts: Debt[]) => void; // New function
 }
 
 const DebtContext = createContext<DebtContextType | undefined>(undefined);
 
-export const DebtProvider = ({ children }: { children: ReactNode }) => {
-  const [debts, setDebts] = useState<Debt[]>([
+const initialSampleDebts: Debt[] = [
     {
       id: 'debt1',
       name: 'Student Loan - Great Lakes',
@@ -47,7 +47,10 @@ export const DebtProvider = ({ children }: { children: ReactNode }) => {
       amountPaid: 17500,
       minimumPayment: 350,
     }
-  ]);
+];
+
+export const DebtProvider = ({ children }: { children: ReactNode }) => {
+  const [debts, setDebts] = useState<Debt[]>(initialSampleDebts);
 
   const addDebt = useCallback((newDebtData: Omit<Debt, 'id'>) => {
     const fullNewDebt: Debt = {
@@ -79,8 +82,12 @@ export const DebtProvider = ({ children }: { children: ReactNode }) => {
     );
   }, []);
 
+  const replaceAllDebts = useCallback((newDebts: Debt[]) => {
+    setDebts(newDebts);
+  }, []);
+
   return (
-    <DebtContext.Provider value={{ debts, addDebt, updateDebt, deleteDebt, makePayment }}>
+    <DebtContext.Provider value={{ debts, addDebt, updateDebt, deleteDebt, makePayment, replaceAllDebts }}>
       {children}
     </DebtContext.Provider>
   );
