@@ -5,7 +5,8 @@ import './globals.css';
 import { AppShell } from '@/components/layout/app-shell';
 import { Toaster } from "@/components/ui/toaster";
 import { AssetProvider } from '@/contexts/AssetContext';
-import { GoalProvider } from '@/contexts/GoalContext'; // Import GoalProvider
+import { GoalProvider } from '@/contexts/GoalContext';
+import { TransactionProvider } from '@/contexts/TransactionContext'; // Import TransactionProvider
 
 const roboto = Roboto({
   weight: ['300', '400', '500', '700'],
@@ -28,10 +29,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${roboto.variable} font-sans antialiased`}>
         <AssetProvider>
-          <GoalProvider> {/* Wrap with GoalProvider */}
-            <AppShell>
-              {children}
-            </AppShell>
+          <GoalProvider>
+            <TransactionProvider> {/* Wrap with TransactionProvider */}
+              <AppShell>
+                {children}
+              </AppShell>
+            </TransactionProvider>
           </GoalProvider>
         </AssetProvider>
         <Toaster />

@@ -6,13 +6,16 @@ import type { AssetCategory } from "@/contexts/AssetContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Bitcoin, Landmark, BarChartBig, WalletCards, TrendingUp, DollarSign, PiggyBank, Building2, AlertTriangle, Target, Plane, ShieldCheck } from "lucide-react";
+import { Bitcoin, Landmark, BarChartBig, WalletCards, TrendingUp, DollarSign, PiggyBank, Building2, AlertTriangle, Target, Plane, ShieldCheck, AreaChart, PieChart as PieChartIcon } from "lucide-react";
 import Link from "next/link";
 import Image from 'next/image';
 import { useAssets } from "@/contexts/AssetContext";
-import { useGoals } from "@/contexts/GoalContext"; // Import useGoals
+import { useGoals } from "@/contexts/GoalContext";
+import { useTransactions, type Transaction } from "@/contexts/TransactionContext"; // Import useTransactions
 import type { Asset } from "@/contexts/AssetContext";
 import type { Goal } from "@/contexts/GoalContext";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 
 const categoryIcons: Record<AssetCategory | 'total', React.ReactNode> = {
@@ -40,11 +43,24 @@ interface CategorySummary {
   assetCount: number;
 }
 
+const PREDEFINED_COLORS = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+  'hsl(200 70% 50%)', // Additional distinct colors
+  'hsl(300 70% 50%)',
+  'hsl(50 70% 50%)',
+];
+
+
 export default function HomePage() {
   const { assets, getAssetMarketValue } = useAssets();
-  const { goals } = useGoals(); // Get goals from context
+  const { goals } = useGoals(); 
+  const { transactions, getTransactionsByMonth } = useTransactions();
 
-  const formatCurrency = (value: number, currencyCode: string) => {
+  const formatCurrency = (value: number, currencyCode: string = "USD") => {
     return value.toLocaleString(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
@@ -62,8 +78,8 @@ export default function HomePage() {
         crypto: { totalValue: 0, totalPurchaseCost: 0, gainLossAmount: 0, gainLossPercent: 0, assetCount: 0 },
         stock: { totalValue: 0, totalPurchaseCost: 0, gainLossAmount: 0, gainLossPercent: 0, assetCount: 0 },
         mutualfund: { totalValue: 0, totalPurchaseCost: 0, gainLossAmount: 0, gainLossPercent: 0, assetCount: 0 },
-        bank: { totalValue: 0, assetCount: 0, totalPurchaseCost: 0, gainLossAmount: 0 }, // Added for consistency
-        property: { totalValue: 0, assetCount: 0, totalPurchaseCost: 0, gainLossAmount: 0 }, // Added for consistency
+        bank: { totalValue: 0, assetCount: 0, totalPurchaseCost: 0, gainLossAmount: 0 }, 
+        property: { totalValue: 0, assetCount: 0, totalPurchaseCost: 0, gainLossAmount: 0 }, 
       };
     }
 
@@ -94,6 +110,34 @@ export default function HomePage() {
   });
   
   const orderedCategories: AssetCategory[] = ['stock', 'crypto', 'mutualfund', 'bank', 'property'];
+
+  // Monthly Overview Data
+  const currentMonth = new Date().getMonth() + 1; // 1-indexed
+  const currentYear = new Date().getFullYear();
+  const monthlyTransactions = getTransactionsByMonth(currentYear, currentMonth);
+
+  const monthlyExpensesByCategory = monthlyTransactions
+    .filter(tx => tx.type === 'expense')
+    .reduce((acc, tx) => {
+      acc[tx.category] = (acc[tx.category] || 0) + tx.amount;
+      return acc;
+    }, {} as Record<string, number>);
+
+  const pieChartData = Object.entries(monthlyExpensesByCategory)
+    .map(([name, value], index) => ({
+      name,
+      value,
+      fill: PREDEFINED_COLORS[index % PREDEFINED_COLORS.length],
+    }))
+    .sort((a, b) => b.value - a.value); // Sort for consistent color assignment if categories change
+
+  const totalMonthlyIncome = monthlyTransactions
+    .filter(tx => tx.type === 'income')
+    .reduce((sum, tx) => sum + tx.amount, 0);
+
+  const totalMonthlyExpenses = monthlyTransactions
+    .filter(tx => tx.type === 'expense')
+    .reduce((sum, tx) => sum + tx.amount, 0);
 
 
   return (
@@ -196,22 +240,63 @@ export default function HomePage() {
       ))}
       
       <div className="grid gap-6 md:grid-cols-2">
+         {/* Monthly Overview Card */}
         <Card className="rounded-2xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Budget Overview</CardTitle>
-            <PiggyBank className="h-5 w-5 text-primary" />
+            <CardTitle className="text-sm font-medium">This Month's Overview</CardTitle>
+            <PieChartIcon className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            {/* This is a placeholder; actual budget data would come from a BudgetContext */}
-            <p className="text-sm">Monthly budget progress will be shown here.</p>
-            <p className="text-xs text-muted-foreground pt-1">Detailed budget management is available on the Budgets page.</p>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Total Income</p>
+                <p className="text-lg font-semibold text-green-600">{formatCurrency(totalMonthlyIncome)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Expenses</p>
+                <p className="text-lg font-semibold text-red-600">{formatCurrency(totalMonthlyExpenses)}</p>
+              </div>
+            </div>
+            {pieChartData.length > 0 ? (
+              <ChartContainer config={{}} className="aspect-square h-[200px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <RechartsTooltip
+                      contentStyle={{ borderRadius: "0.5rem", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)"}}
+                      formatter={(value: number, name: string, props) => [`${formatCurrency(value)} (${((value / totalMonthlyExpenses) * 100).toFixed(1)}%)`, name]}
+                    />
+                    <Pie data={pieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} labelLine={false}
+                         label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
+                            const RADIAN = Math.PI / 180;
+                            const radius = innerRadius + (outerRadius - innerRadius) * 1.2; // Position label outside
+                            const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                            const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                            return ( (percent*100) > 5 && // Only show label if percent > 5%
+                                <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs">
+                                    {name} ({(percent * 100).toFixed(0)}%)
+                                </text>
+                            );
+                        }}
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No expenses recorded this month to display chart.</p>
+            )}
+             <p className="text-xs text-muted-foreground pt-2">Showing data for the current month.</p>
           </CardContent>
            <CardFooter>
-            <Link href="/budgets" className="w-full">
-              <Button variant="outline" className="w-full">Manage Budgets</Button>
+            <Link href="/transactions" className="w-full">
+              <Button variant="outline" className="w-full">View All Transactions</Button>
             </Link>
           </CardFooter>
         </Card>
+
 
         {goals.length > 0 && (
           <Card className="rounded-2xl shadow-lg">
@@ -265,6 +350,22 @@ export default function HomePage() {
               <Button variant="outline" className="w-full">Get Personalized Insights</Button>
             </Link>
           </CardFooter>
+        </Card>
+        
+        <Card className="rounded-2xl shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Budget Health</CardTitle>
+                <PiggyBank className="h-5 w-5 text-primary" />
+            </CardHeader>
+            <CardContent>
+                <p className="text-sm">Your budget overview will appear here once set up.</p>
+                <p className="text-xs text-muted-foreground pt-1">Detailed budget management is available on the Budgets page.</p>
+            </CardContent>
+            <CardFooter>
+                <Link href="/budgets" className="w-full">
+                    <Button variant="outline" className="w-full">Manage Budgets</Button>
+                </Link>
+            </CardFooter>
         </Card>
       </div>
 
