@@ -8,17 +8,17 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'; // DialogTrigger removed for now, form is always visible
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PlusCircle, Trash2, Save, Upload, Camera, AlertTriangle, Edit3, FilterX, Search as SearchIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useTransactions, type Transaction } from '@/contexts/TransactionContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { parseISO, isValid } from 'date-fns'; // isWithinInterval removed as date filtering logic will be adjusted
+import { parseISO, isValid, format } from 'date-fns';
 
 const generateClientUniqueId = () => Math.random().toString(36).substring(2, 11);
 
 interface FormTransaction {
-  id: string; 
+  id: string;
   date: string;
   description: string;
   amount: string;
@@ -53,7 +53,6 @@ const defaultFilterState = {
 
 const appDefinedCategories = ['Groceries', 'Utilities', 'Salary', 'Entertainment', 'Transport', 'Healthcare', 'Education', 'Dining Out', 'Shopping', 'Rent/Mortgage', 'Investment', 'Gifts', 'Other'].sort();
 
-
 export default function TransactionsPage() {
   const { toast } = useToast();
   const { transactions: savedTransactions, addTransactionBatch, deleteTransaction, updateTransaction } = useTransactions();
@@ -63,15 +62,13 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    // Initialize with one row using client-side ID
-    setFormTransactions([{ ...initialTransactionRowData, id: generateClientUniqueId() }]);
+    // Initialize with one row using client-side ID after mount
+    setFormTransactions([{ ...initialTransactionRowData, id: generateClientUniqueId(), category: appDefinedCategories[0] || '' }]);
   }, []);
-
 
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [currentTransactionForEdit, setCurrentTransactionForEdit] = useState<Transaction>(initialEditFormState);
   
-  // State for filters
   const [filterStartDate, setFilterStartDate] = useState(defaultFilterState.startDate);
   const [filterEndDate, setFilterEndDate] = useState(defaultFilterState.endDate);
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>(defaultFilterState.type as 'all' | 'income' | 'expense');
@@ -80,9 +77,8 @@ export default function TransactionsPage() {
 
   const availableCategories = useMemo(() => {
     const allCats = savedTransactions.map(tx => tx.category).concat(appDefinedCategories);
-    return ['all', ...Array.from(new Set(allCats)).sort()];
-  }, [savedTransactions, appDefinedCategories]);
-
+    return ['all', ...Array.from(new Set(allCats)).filter(Boolean).sort()];
+  }, [savedTransactions]);
 
   const handleInputChange = (id: string, field: keyof Omit<FormTransaction, 'id' | 'type' | 'category'>, value: string) => {
     setFormTransactions(
@@ -95,7 +91,7 @@ export default function TransactionsPage() {
   const handleTypeChange = (id: string, value: 'income' | 'expense') => {
     setFormTransactions(
       formTransactions.map((tx) =>
-        tx.id === id ? { ...tx, type: value, category: tx.category || appDefinedCategories[0] } : tx 
+        tx.id === id ? { ...tx, type: value, category: tx.category || (appDefinedCategories[0] || '') } : tx 
       )
     );
   };
@@ -111,7 +107,7 @@ export default function TransactionsPage() {
   const addTransactionRow = () => {
     setFormTransactions([
       ...formTransactions,
-      { ...initialTransactionRowData, id: generateClientUniqueId(), category: appDefinedCategories[0] },
+      { ...initialTransactionRowData, id: generateClientUniqueId(), category: appDefinedCategories[0] || '' },
     ]);
   };
 
@@ -173,7 +169,7 @@ export default function TransactionsPage() {
       title: "Transactions Saved",
       description: `${validTransactionsToSave.length} transaction(s) have been saved successfully.`,
     });
-    setFormTransactions([{ ...initialTransactionRowData, id: generateClientUniqueId(), category: appDefinedCategories[0] }]);
+    setFormTransactions([{ ...initialTransactionRowData, id: generateClientUniqueId(), category: appDefinedCategories[0] || '' }]);
   };
 
   const openEditForm = (transaction: Transaction) => {
@@ -185,7 +181,7 @@ export default function TransactionsPage() {
     setCurrentTransactionForEdit(prev => ({
         ...prev!,
         [field]: value,
-        ...(field === 'type' && {category: prev!.category || appDefinedCategories[0]}) // Reset category if type changes
+        ...(field === 'type' && {category: prev!.category || (appDefinedCategories[0] || '')})
     }));
   };
   
@@ -255,17 +251,16 @@ export default function TransactionsPage() {
     setSearchTerm(defaultFilterState.searchTerm);
   };
 
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Transaction Management</h1>
             <p className="text-muted-foreground">
             Add new transactions or manage your existing entries.
             </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
             <Button variant="outline" onClick={() => handleImportPlaceholder("Bank Statement Import (PDF/CSV)")} className="w-full sm:w-auto">
                 <Upload className="mr-2 h-4 w-4" /> Import Statement
             </Button>
@@ -280,10 +275,10 @@ export default function TransactionsPage() {
           <CardTitle>Batch Transaction Entry</CardTitle>
           <CardDescription>Enter details for multiple transactions below. Click "Save Entered Transactions" at the bottom when done.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-3 sm:p-4 md:p-6">
           {!isMounted && <p className="text-muted-foreground text-center py-4">Loading transaction entry form...</p>}
           {isMounted && formTransactions.map((tx) => (
-            <div key={tx.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-3 md:p-4 border rounded-lg shadow-sm bg-card">
+            <div key={tx.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 items-end p-2 md:p-3 border rounded-lg shadow-sm bg-card">
               <div className="md:col-span-2">
                 <Label htmlFor={`date-${tx.id}`}>Date</Label>
                 <Input
@@ -291,6 +286,7 @@ export default function TransactionsPage() {
                   type="date"
                   value={tx.date}
                   onChange={(e) => handleInputChange(tx.id, 'date', e.target.value)}
+                  className="text-sm"
                 />
               </div>
               <div className="md:col-span-3">
@@ -300,6 +296,7 @@ export default function TransactionsPage() {
                   placeholder="e.g., Coffee, Salary"
                   value={tx.description}
                   onChange={(e) => handleInputChange(tx.id, 'description', e.target.value)}
+                  className="text-sm"
                 />
               </div>
               <div className="md:col-span-2">
@@ -312,6 +309,7 @@ export default function TransactionsPage() {
                   onChange={(e) => handleInputChange(tx.id, 'amount', e.target.value)}
                   min="0.01"
                   step="0.01"
+                  className="text-sm"
                 />
               </div>
               <div className="md:col-span-2">
@@ -320,7 +318,7 @@ export default function TransactionsPage() {
                   value={tx.type}
                   onValueChange={(value: 'income' | 'expense') => handleTypeChange(tx.id, value)}
                 >
-                  <SelectTrigger id={`type-${tx.id}`}>
+                  <SelectTrigger id={`type-${tx.id}`} className="text-sm">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -332,10 +330,10 @@ export default function TransactionsPage() {
               <div className="md:col-span-2">
                 <Label htmlFor={`category-${tx.id}`}>Category</Label>
                  <Select
-                  value={tx.category || appDefinedCategories[0]}
+                  value={tx.category || (appDefinedCategories[0] || '')}
                   onValueChange={(value) => handleCategoryChange(tx.id, value)}
                 >
-                  <SelectTrigger id={`category-${tx.id}`}>
+                  <SelectTrigger id={`category-${tx.id}`} className="text-sm">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -362,14 +360,13 @@ export default function TransactionsPage() {
             </Button>
           )}
         </CardContent>
-        <CardFooter>
+        <CardFooter className="p-3 sm:p-4 md:p-6">
           <Button onClick={handleSaveAllBatch} className="w-full md:w-auto" disabled={!isMounted || formTransactions.length === 0}>
             <Save className="mr-2 h-4 w-4" /> Save Entered Transactions
           </Button>
         </CardFooter>
       </Card>
 
-      {/* Edit Transaction Dialog */}
       <Dialog open={isEditFormOpen} onOpenChange={(isOpen) => {
           setIsEditFormOpen(isOpen);
           if (!isOpen) setCurrentTransactionForEdit(initialEditFormState);
@@ -425,26 +422,25 @@ export default function TransactionsPage() {
         </DialogContent>
       </Dialog>
 
-       {/* Filters Card */}
       <Card className="rounded-2xl shadow-lg">
         <CardHeader>
           <CardTitle>Filter Transactions</CardTitle>
           <CardDescription>Refine the list of transactions displayed below.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
+        <CardContent className="space-y-4 p-3 sm:p-4 md:p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
             <div>
               <Label htmlFor="filter-start-date">Start Date</Label>
-              <Input id="filter-start-date" type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} />
+              <Input id="filter-start-date" type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} className="text-sm" />
             </div>
             <div>
               <Label htmlFor="filter-end-date">End Date</Label>
-              <Input id="filter-end-date" type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} />
+              <Input id="filter-end-date" type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} className="text-sm" />
             </div>
             <div>
               <Label htmlFor="filter-type">Type</Label>
               <Select value={filterType} onValueChange={(value: 'all' | 'income' | 'expense') => setFilterType(value)}>
-                <SelectTrigger id="filter-type">
+                <SelectTrigger id="filter-type" className="text-sm">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -454,10 +450,10 @@ export default function TransactionsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="sm:col-span-2 md:col-span-1"> {/* Adjusted for better layout */}
+            <div className="sm:col-span-2 lg:col-span-1">
               <Label htmlFor="filter-category">Category</Label>
               <Select value={filterCategory} onValueChange={(value) => setFilterCategory(value)}>
-                <SelectTrigger id="filter-category">
+                <SelectTrigger id="filter-category" className="text-sm">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -467,7 +463,7 @@ export default function TransactionsPage() {
                 </SelectContent>
               </Select>
             </div>
-             <div className="relative sm:col-span-2 md:col-span-1"> {/* Adjusted for better layout */}
+             <div className="relative sm:col-span-2 lg:col-span-1">
                 <Label htmlFor="filter-search-term">Search Description</Label>
                 <div className="relative">
                     <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -477,12 +473,12 @@ export default function TransactionsPage() {
                     placeholder="Search descriptions..." 
                     value={searchTerm} 
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8" 
+                    className="pl-8 text-sm" 
                     />
                 </div>
             </div>
-             <div className="sm:col-span-2 md:col-span-1 flex items-end"> {/* Adjusted for better layout */}
-              <Button onClick={clearFilters} variant="outline" className="w-full">
+             <div className="sm:col-span-2 lg:col-span-1 flex items-end">
+              <Button onClick={clearFilters} variant="outline" className="w-full text-sm">
                 <FilterX className="mr-2 h-4 w-4" /> Clear Filters
               </Button>
             </div>
@@ -490,15 +486,14 @@ export default function TransactionsPage() {
         </CardContent>
       </Card>
 
-
       <Card className="rounded-2xl shadow-lg">
         <CardHeader>
             <CardTitle>All Transactions</CardTitle>
             <CardDescription>A log of all your recorded income and expenses. Use filters above to narrow down the list.</CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="overflow-x-auto p-0 sm:p-2 md:p-4">
             {filteredTransactions.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">
+                <div className="text-center text-muted-foreground py-8 px-4">
                     <AlertTriangle className="mx-auto h-12 w-12 mb-4 text-primary" />
                     <p className="text-lg font-semibold">No transactions match your filters!</p>
                     <p>Try adjusting your filters or add new transactions.</p>
@@ -507,30 +502,32 @@ export default function TransactionsPage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="min-w-[100px]">Date</TableHead>
-                            <TableHead className="min-w-[200px]">Description</TableHead>
-                            <TableHead className="min-w-[120px]">Category</TableHead>
-                            <TableHead className="min-w-[80px]">Type</TableHead>
-                            <TableHead className="text-right min-w-[100px]">Amount</TableHead>
-                            <TableHead className="text-center min-w-[100px]">Actions</TableHead>
+                            <TableHead className="min-w-[100px] text-xs sm:text-sm">Date</TableHead>
+                            <TableHead className="min-w-[150px] sm:min-w-[200px] text-xs sm:text-sm">Description</TableHead>
+                            <TableHead className="min-w-[100px] sm:min-w-[120px] text-xs sm:text-sm">Category</TableHead>
+                            <TableHead className="min-w-[70px] sm:min-w-[80px] text-xs sm:text-sm">Type</TableHead>
+                            <TableHead className="text-right min-w-[90px] sm:min-w-[100px] text-xs sm:text-sm">Amount</TableHead>
+                            <TableHead className="text-center min-w-[80px] sm:min-w-[100px] text-xs sm:text-sm">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {filteredTransactions.map((tx) => {
-                            const txDate = parseISO(tx.date);
-                            const displayDate = isValid(txDate) ? txDate.toLocaleDateString() : "Invalid Date";
+                            let displayDate = "Invalid Date";
+                            if (tx.date && isValid(parseISO(tx.date))) {
+                                displayDate = format(parseISO(tx.date), "P");
+                            }
                             return (
                                 <TableRow key={tx.id}>
-                                    <TableCell>{displayDate}</TableCell>
-                                    <TableCell className="font-medium">{tx.description}</TableCell>
-                                    <TableCell>{tx.category}</TableCell>
-                                    <TableCell className={`capitalize ${tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    <TableCell className="text-xs sm:text-sm">{displayDate}</TableCell>
+                                    <TableCell className="font-medium text-xs sm:text-sm">{tx.description}</TableCell>
+                                    <TableCell className="text-xs sm:text-sm">{tx.category}</TableCell>
+                                    <TableCell className={`capitalize text-xs sm:text-sm ${tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                         {tx.type}
                                     </TableCell>
-                                    <TableCell className={`text-right font-semibold ${tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    <TableCell className={`text-right font-semibold text-xs sm:text-sm ${tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                     {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
                                     </TableCell>
-                                    <TableCell className="text-center space-x-1">
+                                    <TableCell className="text-center space-x-0 sm:space-x-1">
                                         <Button variant="ghost" size="icon" aria-label="Edit transaction" onClick={() => openEditForm(tx)}>
                                             <Edit3 className="h-4 w-4" />
                                         </Button>

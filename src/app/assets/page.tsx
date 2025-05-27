@@ -10,14 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, WalletCards, Coins, Info, AlertTriangle, Search, ArrowLeft } from 'lucide-react'; // Removed RefreshCcw, ExternalLink
+import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, WalletCards, Coins, Info, AlertTriangle, Search, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
-// Chart related imports commented out as they are not currently used after manual price entry switch
-// import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-// import { BarChart, Line, LineChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { useToast } from "@/hooks/use-toast";
 import { useAssets, type Asset as ContextAsset, type AssetCategory } from '@/contexts/AssetContext';
-// import { fetchAssetPrice, type PriceFetchResult, searchTickerSymbols, TickerSuggestion } from '@/services/marketService'; // Commented out as per manual entry
+import { motion } from 'framer-motion';
+
 
 const assetIcons: Record<AssetCategory | 'overview', React.ReactNode> = {
   overview: <WalletCards className="h-5 w-5 text-muted-foreground" />,
@@ -36,7 +34,6 @@ const initialAssetFormState: Partial<ContextAsset> = {
   purchasePrice: 0,
   currentPrice: 0,
   tickerSymbol: '',
-  // priceFetchError: undefined, // Removed as per manual entry
 };
 
 const supportedCurrencies = [
@@ -97,16 +94,16 @@ const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: Con
 
   return (
       <Card className="rounded-2xl shadow-lg flex flex-col h-full">
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <CardHeader className="flex flex-row items-start justify-between gap-4 p-4 sm:p-6">
           <div>
             <CardTitle className="text-lg">{asset.name}</CardTitle>
-            <CardDescription className="capitalize">
+            <CardDescription className="capitalize text-xs sm:text-sm">
               {categoryDisplayNames[asset.category]} {asset.tickerSymbol && `(${asset.tickerSymbol})`} - {asset.currency}
             </CardDescription>
           </div>
           {assetIcons[asset.category] ? React.cloneElement(assetIcons[asset.category] as React.ReactElement, { className: "h-8 w-8" }) : <WalletCards className="h-8 w-8" />}
         </CardHeader>
-        <CardContent className="flex-grow space-y-3">
+        <CardContent className="flex-grow space-y-3 p-4 sm:p-6 pt-0">
           <div className="space-y-1">
             <p className="text-xl md:text-2xl font-semibold">{formatCurrency(marketValue, asset.currency)}</p>
             <p className="text-xs text-muted-foreground">
@@ -135,7 +132,7 @@ const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: Con
             Details last saved: {clientFormattedLastUpdated !== null ? clientFormattedLastUpdated : (asset.lastUpdated ? "Loading save date..." : "")}
           </p>
         </CardContent>
-        <CardFooter className="flex justify-end items-center gap-1">
+        <CardFooter className="flex justify-end items-center gap-1 p-4 sm:p-6 pt-0">
               <Button variant="ghost" size="icon" onClick={() => onEdit(asset)} aria-label="Edit asset">
                 <Edit3 className="h-4 w-4" />
               </Button>
@@ -329,12 +326,19 @@ export default function AssetsPage() {
   const renderContentForTab = (tab: AssetCategory | 'overview') => {
     if (tab === 'overview') {
       return (
+        <motion.div
+          key="overview-content"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 20 }}
+          transition={{ duration: 0.25 }}
+        >
         <Card className="rounded-2xl shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle>Portfolio Snapshot</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-4 sm:p-6">
+              <CardTitle className="text-lg sm:text-xl">Portfolio Snapshot</CardTitle>
               <Coins className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
               {Object.keys(portfolioTotalsByCurrency).length === 0 && <p className="text-muted-foreground">No assets to display totals for. Add some assets to get started.</p>}
               {Object.entries(portfolioTotalsByCurrency).map(([currency, totalData]) => {
                   const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
@@ -342,7 +346,7 @@ export default function AssetsPage() {
                       : (totalData.allTimeGain !== 0 ? Infinity : 0); 
                   return (
                       <div key={currency} className="mb-3">
-                      <p className="text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
+                      <p className="text-xl sm:text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
                           <span className="text-sm text-muted-foreground ml-1">({currency} Total Portfolio)</span>
                       </p>
                       {(totalData.allTimeGain !== 0) && (
@@ -362,7 +366,7 @@ export default function AssetsPage() {
               })}
           </CardContent>
           {allAssets.length === 0 && (
-              <CardContent className="pt-0">
+              <CardContent className="pt-0 p-4 sm:p-6">
                   <div className="text-center text-muted-foreground py-4">
                       <WalletCards className="mx-auto h-12 w-12 mb-4 text-primary" />
                       <p className="text-lg font-semibold">No assets yet!</p>
@@ -371,18 +375,26 @@ export default function AssetsPage() {
               </CardContent>
           )}
         </Card>
+        </motion.div>
       );
     } else { 
       const category = tab as AssetCategory;
       const assetsForThisCategory = displayedAssets.filter(asset => asset.category === category);
       return (
-        <>
+         <motion.div
+            key={`${category}-content`}
+            initial={{ opacity: 0, x: activeTab === 'overview' ? 20 : -20 }} // Slide direction based on previous tab
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: activeTab === 'overview' ? -20 : 20 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-4"
+          >
           <Card className="rounded-2xl shadow-lg mb-6">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle>{categoryDisplayNames[category]} Summary</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between pb-2 p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">{categoryDisplayNames[category]} Summary</CardTitle>
             {assetIcons[category] ? React.cloneElement(assetIcons[category] as React.ReactElement) : <Coins className="h-5 w-5 text-muted-foreground" />}
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6 pt-0">
             {Object.keys(categorySpecificTotals).length === 0 && assetsForThisCategory.length === 0 && <p className="text-muted-foreground">No assets in this category. Add one using the "Add Asset" button.</p>}
             {Object.entries(categorySpecificTotals).map(([currency, totalData]) => {
                 const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
@@ -423,7 +435,7 @@ export default function AssetsPage() {
 
           {assetsForThisCategory.length === 0 && (
               <Card className="rounded-2xl shadow-lg">
-                  <CardContent className="pt-6 text-center text-muted-foreground">
+                  <CardContent className="pt-6 text-center text-muted-foreground p-4 sm:p-6">
                       {assetIcons[category] ? React.cloneElement(assetIcons[category] as React.ReactElement, { className: "mx-auto h-12 w-12 mb-4 text-primary" }) : <WalletCards className="mx-auto h-12 w-12 mb-4 text-primary" />}
                       <p className="text-lg font-semibold">No {categoryDisplayNames[category].toLowerCase()} added yet!</p>
                       <p>Use the "Add Asset" button above to track your {categoryDisplayNames[category].toLowerCase()}.</p>
@@ -431,9 +443,18 @@ export default function AssetsPage() {
               </Card>
           )}
 
-          <div className="grid gap-6 md:grid-cols-1"> {/* Single column for list view */}
+          <div className="grid gap-4 md:gap-6 grid-cols-1">
               {assetsForThisCategory.map((asset) => (
-                  <AssetCardComponent key={asset.id} asset={asset} onEdit={openForm} onDelete={handleDeleteAsset} />
+                <motion.div
+                    key={asset.id}
+                    className="h-full"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                  <AssetCardComponent asset={asset} onEdit={openForm} onDelete={handleDeleteAsset} />
+                </motion.div>
               ))}
           </div>
           {assetsForThisCategory.length > 0 && (
@@ -442,22 +463,17 @@ export default function AssetsPage() {
               All prices are manually entered by the user. All-time gain/loss is calculated based on purchase price and current price.
             </div>
           )}
-        </>
+        </motion.div>
       );
     }
   };
 
-  const goBackToOverview = () => {
-     handleTabChange('overview');
-  };
-
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            {activeTab === 'overview' ? 'Asset Portfolio' : `${categoryDisplayNames[activeTab]} Assets`}
+            {activeTab === 'overview' ? 'Asset Portfolio Overview' : `${categoryDisplayNames[activeTab]} Assets`}
           </h1>
           <p className="text-muted-foreground">
             {activeTab === 'overview' ? 'Your financial asset overview.' : `Manage your ${categoryDisplayNames[activeTab].toLowerCase()}.`}
@@ -514,9 +530,6 @@ export default function AssetsPage() {
                             ''
                         }
                     />
-                    <p className="col-span-1 sm:col-span-4 text-xs text-muted-foreground sm:text-right pt-1">
-                       <Search className="inline h-3 w-3 mr-1" /> For stocks/crypto, use common ticker (e.g. AAPL, BTCUSD). For Mutual Funds, use scheme code if known.
-                    </p>
                 </div>
             )}
 
@@ -584,11 +597,13 @@ export default function AssetsPage() {
         
         <div className="relative mt-2"> 
             {activeTab !== 'overview' && (
-                <Button variant="outline" size="sm" onClick={goBackToOverview} className="mb-4">
+                <Button variant="outline" size="sm" onClick={() => handleTabChange('overview')} className="mb-4">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to Overview
                 </Button>
             )}
-            <TabsContent value={activeTab} forceMount className="w-full">
+            {/* This is where AnimatePresence would wrap conditional content rendering based on activeTab */}
+            {/* For simplicity, direct rendering is kept, but framer-motion would wrap this block */}
+            <TabsContent value={activeTab} forceMount={true} className="w-full">
                 {renderContentForTab(activeTab)}
             </TabsContent>
         </div>
@@ -596,5 +611,4 @@ export default function AssetsPage() {
     </div>
   );
 }
-
     

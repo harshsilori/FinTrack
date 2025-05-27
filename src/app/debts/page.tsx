@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { PlusCircle, Edit3, Trash2, CreditCard, DollarSign, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useDebts, type Debt as ContextDebt } from '@/contexts/DebtContext';
+import { motion } from 'framer-motion';
 
 const initialDebtFormState: Partial<ContextDebt> = {
   name: '',
@@ -30,12 +31,17 @@ const DebtCardComponent = ({ debt, onEdit, onDelete, onMakePayment }: { debt: Co
   };
 
   return (
+    <motion.div
+        className="h-full"
+        whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+        whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+      >
       <Card className={`rounded-2xl shadow-lg flex flex-col h-full ${isPaidOff ? 'bg-green-50 dark:bg-green-900/30 border-green-500' : ''}`}>
-        <CardHeader>
+        <CardHeader className="p-4 sm:p-6">
           <div className="flex justify-between items-start">
             <div>
               <CardTitle className="text-lg">{debt.name}</CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs sm:text-sm">
                 {isPaidOff ? 'Paid Off!' : `Remaining: ${formatCurrency(remainingBalance)}`}
               </CardDescription>
               {debt.interestRate && <CardDescription className="text-xs">Interest Rate: {debt.interestRate}%</CardDescription>}
@@ -43,7 +49,7 @@ const DebtCardComponent = ({ debt, onEdit, onDelete, onMakePayment }: { debt: Co
             {isPaidOff ? <CheckCircle className="h-8 w-8 text-green-500" /> : <CreditCard className="h-8 w-8 text-primary" />}
           </div>
         </CardHeader>
-        <CardContent className="flex-grow space-y-3">
+        <CardContent className="flex-grow space-y-3 p-4 sm:p-6 pt-0">
           <div className="flex justify-between items-baseline">
             <p className="text-xl sm:text-2xl font-semibold">{formatCurrency(debt.amountPaid)}</p>
             <p className="text-sm text-muted-foreground">of {formatCurrency(debt.totalAmount)} paid</p>
@@ -54,7 +60,7 @@ const DebtCardComponent = ({ debt, onEdit, onDelete, onMakePayment }: { debt: Co
             {debt.minimumPayment && !isPaidOff && <span>Min. Payment: {formatCurrency(debt.minimumPayment)}</span>}
           </div>
         </CardContent>
-        <CardFooter className="flex justify-between items-center gap-2">
+        <CardFooter className="flex justify-between items-center gap-2 p-4 sm:p-6 pt-0">
           <Button variant="outline" size="sm" onClick={() => onMakePayment(debt)} disabled={isPaidOff}>
             <DollarSign className="mr-1 h-4 w-4" /> Make Payment
           </Button>
@@ -68,6 +74,7 @@ const DebtCardComponent = ({ debt, onEdit, onDelete, onMakePayment }: { debt: Co
           </div>
         </CardFooter>
       </Card>
+    </motion.div>
   );
 };
 
@@ -96,7 +103,6 @@ export default function DebtsPage() {
       toast({ title: "Error", description: "Amount paid cannot be greater than the total debt amount.", variant: "destructive" });
       return;
     }
-
 
     const debtData: Omit<ContextDebt, 'id'> = {
       name: currentDebtForForm.name,
@@ -148,7 +154,7 @@ export default function DebtsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Debt Management</h1>
           <p className="text-muted-foreground">
@@ -160,7 +166,7 @@ export default function DebtsPage() {
             if (!isOpen) setCurrentDebtForForm(initialDebtFormState);
         }}>
           <DialogTrigger asChild>
-            <Button onClick={() => openForm()}>
+            <Button onClick={() => openForm()} className="w-full md:w-auto">
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Debt
             </Button>
           </DialogTrigger>
@@ -201,7 +207,6 @@ export default function DebtsPage() {
         </Dialog>
       </div>
 
-      {/* Make Payment Dialog */}
       <Dialog open={isPaymentFormOpen} onOpenChange={(isOpen) => {
           setIsPaymentFormOpen(isOpen);
           if (!isOpen) setDebtForPayment(null);
@@ -236,7 +241,7 @@ export default function DebtsPage() {
       
       {debts.length === 0 && (
         <Card className="rounded-2xl shadow-lg">
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 p-4 sm:p-6">
             <div className="text-center text-muted-foreground">
               <AlertTriangle className="mx-auto h-12 w-12 mb-4 text-primary" />
               <p className="text-lg font-semibold">No debts tracked yet!</p>
@@ -246,7 +251,7 @@ export default function DebtsPage() {
         </Card>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {debts.map((debt) => (
           <DebtCardComponent 
             key={debt.id} 
@@ -260,5 +265,4 @@ export default function DebtsPage() {
     </div>
   );
 }
-
     

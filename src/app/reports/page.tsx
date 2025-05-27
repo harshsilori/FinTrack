@@ -128,67 +128,67 @@ export default function ReportsPage() {
     document.body.removeChild(link);
   };
 
-
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Financial Reports</h1>
-        <p className="text-muted-foreground">
+      </div>
+        <p className="text-muted-foreground mt-1">
           Analyze your spending habits and financial trends.
         </p>
-      </div>
 
       <Card className="rounded-2xl shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             Spending by Category 
             <CalendarSearch className="h-5 w-5 text-primary" />
           </CardTitle>
-          <CardDescription>Select a date range to analyze your spending.</CardDescription>
+          <CardDescription className="mt-1">Select a date range to analyze your spending.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end border p-4 rounded-lg">
+        <CardContent className="space-y-4 p-4 sm:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end border p-3 sm:p-4 rounded-lg">
                 <div>
-                    <Label htmlFor="report-start-date">Start Date</Label>
+                    <Label htmlFor="report-start-date" className="text-xs sm:text-sm">Start Date</Label>
                     <Input 
                         id="report-start-date" 
                         type="date" 
                         value={reportStartDate} 
-                        onChange={(e) => setReportStartDate(e.target.value)} 
+                        onChange={(e) => setReportStartDate(e.target.value)}
+                        className="text-sm" 
                     />
                 </div>
                 <div>
-                    <Label htmlFor="report-end-date">End Date</Label>
+                    <Label htmlFor="report-end-date" className="text-xs sm:text-sm">End Date</Label>
                     <Input 
                         id="report-end-date" 
                         type="date" 
                         value={reportEndDate} 
-                        onChange={(e) => setReportEndDate(e.target.value)} 
+                        onChange={(e) => setReportEndDate(e.target.value)}
+                        className="text-sm"
                     />
                 </div>
             </div>
-            <div className="text-center font-medium text-primary pt-2">
+            <div className="text-center font-medium text-primary pt-2 text-sm sm:text-base">
                 Report for: {reportPeriodTitle}
             </div>
         </CardContent>
       </Card>
 
-
       <Card className="rounded-2xl shadow-lg">
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 gap-2">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-2 gap-2 p-4 sm:p-6">
           <CardTitle className="text-lg sm:text-xl">Expense Breakdown: {reportPeriodTitle}</CardTitle>
            <Button onClick={handleExportToCsv} variant="outline" size="sm" disabled={expensesByCategoryForPeriod.length === 0} className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" />
             Export to CSV
           </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-2 sm:p-4 md:p-6">
           {expensesByCategoryForPeriod.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 items-start">
               <div className="w-full">
-                <ChartContainer config={{}} className="aspect-square h-[250px] sm:h-[300px] w-full">
+                <ChartContainer config={{}} className="aspect-square h-[200px] sm:h-[250px] md:h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                    <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                       <RechartsTooltip
                         contentStyle={{ borderRadius: "0.5rem", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)"}}
                         formatter={(value: number, name: string) => {
@@ -202,7 +202,7 @@ export default function ReportsPage() {
                         nameKey="name"
                         cx="50%"
                         cy="50%"
-                        outerRadius={80} 
+                        outerRadius={70} 
                         labelLine={false}
                         label={renderCustomizedLabel}
                       >
@@ -210,42 +210,42 @@ export default function ReportsPage() {
                           <Cell key={`cell-report-${index}`} fill={entry.fill ?? '#000000'} stroke="hsl(var(--background))" strokeWidth={2}/>
                         ))}
                       </Pie>
-                      <Legend iconSize={10} layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{paddingTop: "15px"}}/>
+                      <Legend iconSize={8} layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{paddingTop: "10px", fontSize: "0.7rem"}}/>
                     </PieChart>
                   </ResponsiveContainer>
                 </ChartContainer>
               </div>
               <div className="overflow-x-auto">
-                <h3 className="text-lg font-semibold mb-2">Expense Summary</h3>
+                <h3 className="text-md sm:text-lg font-semibold mb-2">Expense Summary</h3>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">% of Total</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Category</TableHead>
+                      <TableHead className="text-right text-xs sm:text-sm">Amount</TableHead>
+                      <TableHead className="text-right text-xs sm:text-sm">% of Total</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {expensesByCategoryForPeriod.map((item) => (
                       <TableRow key={item.name}>
-                        <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.value)}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="font-medium text-xs sm:text-sm">{item.name}</TableCell>
+                        <TableCell className="text-right text-xs sm:text-sm">{formatCurrency(item.value)}</TableCell>
+                        <TableCell className="text-right text-xs sm:text-sm">
                           {totalExpensesForPeriod > 0 ? ((item.value / totalExpensesForPeriod) * 100).toFixed(1) : '0.0'}%
                         </TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="font-bold border-t-2">
-                      <TableCell>Total Expenses</TableCell>
-                      <TableCell className="text-right">{formatCurrency(totalExpensesForPeriod)}</TableCell>
-                      <TableCell className="text-right">100%</TableCell>
+                      <TableCell className="text-xs sm:text-sm">Total Expenses</TableCell>
+                      <TableCell className="text-right text-xs sm:text-sm">{formatCurrency(totalExpensesForPeriod)}</TableCell>
+                      <TableCell className="text-right text-xs sm:text-sm">100%</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
               </div>
             </div>
           ) : (
-            <div className="text-center text-muted-foreground py-8">
+            <div className="text-center text-muted-foreground py-8 px-4">
               <Info className="mx-auto h-12 w-12 mb-4 text-primary" />
               <p className="text-lg font-semibold">No expenses recorded for the selected period.</p>
               <p>Try adjusting the date range or add some transactions.</p>
@@ -256,5 +256,4 @@ export default function ReportsPage() {
     </div>
   );
 }
-
     

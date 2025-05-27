@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTransactions, type Transaction } from '@/contexts/TransactionContext';
 import { useBudgets, type Budget, budgetPeriods, budgetCategories } from '@/contexts/BudgetContext'; 
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
+import { motion } from 'framer-motion';
 
 const BudgetCard = React.memo(({ 
   budget, 
@@ -76,19 +77,23 @@ const BudgetCard = React.memo(({
     return value.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-
   return (
+    <motion.div
+        className="h-full"
+        whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+        whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+      >
       <Card key={budget.id} className="rounded-2xl shadow-lg flex flex-col h-full">
-        <CardHeader>
+        <CardHeader className="p-4 sm:p-6">
           <div className="flex justify-between items-start">
             <div>
               <CardTitle className="text-lg">{budget.name}</CardTitle>
-              <CardDescription className="capitalize">{budget.category} - {budgetPeriods.find(p=>p.value === budget.period)?.label} {budget.period === 'custom' && budget.customPeriodDetails ? `(${budget.customPeriodDetails})` : ''}</CardDescription>
+              <CardDescription className="capitalize text-xs sm:text-sm">{budget.category} - {budgetPeriods.find(p=>p.value === budget.period)?.label} {budget.period === 'custom' && budget.customPeriodDetails ? `(${budget.customPeriodDetails})` : ''}</CardDescription>
             </div>
             <PiggyBank className="h-8 w-8 text-primary" />
           </div>
         </CardHeader>
-        <CardContent className="flex-grow space-y-2">
+        <CardContent className="flex-grow space-y-2 p-4 sm:p-6 pt-0">
           {isComplexPeriod ? (
             <p className="text-sm text-muted-foreground">Manual tracking needed for spent amount in this period.</p>
           ) : (
@@ -102,7 +107,7 @@ const BudgetCard = React.memo(({
             </>
           )}
         </CardContent>
-        <CardFooter className="flex justify-end gap-2">
+        <CardFooter className="flex justify-end gap-2 p-4 sm:p-6 pt-0">
           <Button variant="ghost" size="icon" onClick={() => onEdit(budget)} aria-label="Edit budget">
             <Edit3 className="h-4 w-4" />
           </Button>
@@ -111,6 +116,7 @@ const BudgetCard = React.memo(({
           </Button>
         </CardFooter>
       </Card>
+    </motion.div>
   );
 });
 BudgetCard.displayName = 'BudgetCard';
@@ -160,7 +166,7 @@ export default function BudgetsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Budget Manager</h1>
           <p className="text-muted-foreground">
@@ -172,7 +178,7 @@ export default function BudgetsPage() {
             if (!isOpen) setCurrentBudget(null);
         }}>
           <DialogTrigger asChild>
-            <Button onClick={() => openForm()}>
+            <Button onClick={() => openForm()} className="w-full md:w-auto">
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Budget
             </Button>
           </DialogTrigger>
@@ -231,7 +237,7 @@ export default function BudgetsPage() {
       
       {budgets.length === 0 && (
         <Card className="rounded-2xl shadow-lg">
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 p-4 sm:p-6">
             <div className="text-center text-muted-foreground">
               <PiggyBank className="mx-auto h-12 w-12 mb-4" />
               <p className="text-lg font-semibold">No budgets yet!</p>
@@ -241,7 +247,7 @@ export default function BudgetsPage() {
         </Card>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {budgets.map((budget) => (
            <BudgetCard 
              key={budget.id} 
@@ -255,5 +261,4 @@ export default function BudgetsPage() {
     </div>
   );
 }
-
     

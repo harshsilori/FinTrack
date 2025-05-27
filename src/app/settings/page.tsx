@@ -20,7 +20,6 @@ import { useGoals, type Goal } from '@/contexts/GoalContext';
 import { useBudgets, type Budget } from '@/contexts/BudgetContext';
 import { useDebts, type Debt } from '@/contexts/DebtContext';
 
-// Sample Data Definitions (remain for "Load Sample Data" functionality)
 const sampleAssetsData: Asset[] = [
   { id: 'sampleAsset1', name: 'Sample Savings', category: 'bank', currency: 'USD', quantity: 1, currentPrice: 15000, lastUpdated: '2024-07-01' },
   { id: 'sampleAsset2', name: 'Sample Tech Stock', category: 'stock', currency: 'USD', quantity: 50, purchasePrice: 100, currentPrice: 120, tickerSymbol: 'SMPL', lastUpdated: '2024-07-01' },
@@ -196,7 +195,6 @@ export default function SettingsPage() {
     fileInputRef.current?.click();
   };
 
-
   const themeOptions = [
     { value: 'theme-default', label: 'Default Blue', primary: 'hsl(231 48% 48%)', accent: 'hsl(261 44% 58%)' },
     { value: 'theme-forest', label: 'Forest Green', primary: 'hsl(142 60% 35%)', accent: 'hsl(158 44% 48%)' },
@@ -204,22 +202,21 @@ export default function SettingsPage() {
     { value: 'theme-ocean', label: 'Ocean Teal', primary: 'hsl(180 70% 40%)', accent: 'hsl(195 65% 55%)' },
   ];
 
-
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">
+      </div>
+        <p className="text-muted-foreground mt-1">
           Manage your account and application preferences.
         </p>
-      </div>
 
       <Card className="rounded-2xl shadow-lg">
-        <CardHeader>
+        <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2"><UserCircle className="h-5 w-5 text-primary"/> Profile Settings</CardTitle>
           <CardDescription>Update your personal information. (Note: Password changes are handled through re-registration for local accounts)</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-4 sm:p-6">
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="name">Full Name</Label>
@@ -240,11 +237,11 @@ export default function SettingsPage() {
       <Separator />
 
       <Card className="rounded-2xl shadow-lg">
-        <CardHeader>
+        <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary"/> Theme Settings</CardTitle>
           <CardDescription>Customize the look and feel of the application.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 p-4 sm:p-6">
            <div className="flex items-center justify-between">
             <Label htmlFor="dark-mode" className="flex flex-col space-y-1">
               <span>Dark Mode</span>
@@ -267,16 +264,16 @@ export default function SettingsPage() {
                 <Label 
                   key={theme.value} 
                   htmlFor={theme.value}
-                  className="flex flex-col items-start cursor-pointer rounded-md border border-muted p-4 hover:border-primary data-[state=checked]:border-primary data-[state=checked]:ring-2 data-[state=checked]:ring-primary"
+                  className="flex flex-col items-start cursor-pointer rounded-md border border-muted p-3 sm:p-4 hover:border-primary data-[state=checked]:border-primary data-[state=checked]:ring-2 data-[state=checked]:ring-primary"
                   data-state={accentTheme === theme.value ? 'checked' : 'unchecked'}
                 >
                   <div className="flex items-center justify-between w-full">
-                    <span className="font-medium">{theme.label}</span>
+                    <span className="font-medium text-sm sm:text-base">{theme.label}</span>
                     <RadioGroupItem value={theme.value} id={theme.value} className="shrink-0" />
                   </div>
                   <div className="flex gap-2 mt-2">
-                    <div className="h-6 w-10 rounded" style={{ backgroundColor: theme.primary }}></div>
-                    <div className="h-6 w-10 rounded" style={{ backgroundColor: theme.accent }}></div>
+                    <div className="h-5 w-8 sm:h-6 sm:w-10 rounded" style={{ backgroundColor: theme.primary }}></div>
+                    <div className="h-5 w-8 sm:h-6 sm:w-10 rounded" style={{ backgroundColor: theme.accent }}></div>
                   </div>
                 </Label>
               ))}
@@ -288,11 +285,11 @@ export default function SettingsPage() {
       <Separator />
       
       <Card className="rounded-2xl shadow-lg">
-        <CardHeader>
+        <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-primary"/> Notification Preferences</CardTitle>
           <CardDescription>Control how you receive notifications. (Functionality not implemented)</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <Label htmlFor="email-notifications" className="flex flex-col space-y-1">
               <span>Email Notifications</span>
@@ -318,11 +315,11 @@ export default function SettingsPage() {
       <Separator />
       
       <Card className="rounded-2xl shadow-lg">
-        <CardHeader>
+        <CardHeader className="p-4 sm:p-6">
           <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-primary"/> Data Management</CardTitle>
           <CardDescription>Manage your application data. Backups are stored locally as JSON files.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-4 sm:p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Button onClick={handleBackupData} variant="outline" className="w-full">
                     <DownloadCloud className="mr-2 h-4 w-4" /> Backup All Data
@@ -390,5 +387,4 @@ export default function SettingsPage() {
     </div>
   );
 }
-
     

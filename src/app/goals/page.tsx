@@ -14,6 +14,7 @@ import { useGoals, type Goal as ContextGoal } from '@/contexts/GoalContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, differenceInDays, isValid, parseISO } from 'date-fns';
+import { motion } from 'framer-motion';
 
 const goalIcons: Record<string, React.ReactNode> = {
   Target: <Target className="h-8 w-8 text-primary" />,
@@ -33,7 +34,6 @@ const initialGoalFormState: Partial<ContextGoal> = {
   icon: 'Target',
 };
 
-
 const GoalCardComponent = React.memo(({ goal, onEdit, onDelete, onAddFunds }: { goal: ContextGoal; onEdit: (goal: ContextGoal) => void; onDelete: (id: string) => void; onAddFunds: (id: string) => void; }) => {
   const progressPercentage = goal.targetAmount > 0 ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100) : 0;
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
@@ -43,13 +43,19 @@ const GoalCardComponent = React.memo(({ goal, onEdit, onDelete, onAddFunds }: { 
   useEffect(() => {
     setIsCompleted(goal.currentAmount >= goal.targetAmount);
     if (goal.targetDate) {
-      const target = parseISO(goal.targetDate);
-      if (isValid(target)) {
-        setDaysLeft(differenceInDays(target, new Date()));
-        setClientFormattedTargetDate(format(target, "PPP"));
-      } else {
+      try {
+        const target = parseISO(goal.targetDate);
+        if (isValid(target)) {
+          setDaysLeft(differenceInDays(target, new Date()));
+          setClientFormattedTargetDate(format(target, "PPP"));
+        } else {
+          setDaysLeft(null);
+          setClientFormattedTargetDate("Invalid date");
+        }
+      } catch (e) {
+        console.error("Error parsing target date in GoalCard:", e);
         setDaysLeft(null);
-        setClientFormattedTargetDate(null);
+        setClientFormattedTargetDate("Error in date");
       }
     } else {
       setDaysLeft(null);
@@ -64,12 +70,17 @@ const GoalCardComponent = React.memo(({ goal, onEdit, onDelete, onAddFunds }: { 
   };
 
   return (
+     <motion.div
+        className="h-full"
+        whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+        whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+      >
       <Card className={`rounded-2xl shadow-lg flex flex-col h-full ${isCompleted ? 'bg-green-50 dark:bg-green-900/30 border-green-500' : ''}`}>
-        <CardHeader>
+        <CardHeader className="p-4 sm:p-6">
           <div className="flex justify-between items-start">
             <div>
               <CardTitle className="text-lg">{goal.name}</CardTitle>
-              <CardDescription>Target: {formatCurrency(goal.targetAmount)}</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">Target: {formatCurrency(goal.targetAmount)}</CardDescription>
               {clientFormattedTargetDate && !isCompleted && (
                 <CardDescription className="text-xs">Target Date: {clientFormattedTargetDate}</CardDescription>
               )}
@@ -80,7 +91,7 @@ const GoalCardComponent = React.memo(({ goal, onEdit, onDelete, onAddFunds }: { 
             {isCompleted ? <CheckCircle className="h-8 w-8 text-green-500" /> : iconNode}
           </div>
         </CardHeader>
-        <CardContent className="flex-grow space-y-3">
+        <CardContent className="flex-grow space-y-3 p-4 sm:p-6 pt-0">
           <div className="flex justify-between items-baseline">
             <p className="text-xl sm:text-2xl font-semibold">{formatCurrency(goal.currentAmount)}</p>
             <p className="text-sm text-muted-foreground">of {formatCurrency(goal.targetAmount)}</p>
@@ -96,7 +107,7 @@ const GoalCardComponent = React.memo(({ goal, onEdit, onDelete, onAddFunds }: { 
             {isCompleted && <span className="text-green-600 font-semibold">Goal Achieved!</span>}
           </div>
         </CardContent>
-        <CardFooter className="flex justify-between items-center gap-2">
+        <CardFooter className="flex justify-between items-center gap-2 p-4 sm:p-6 pt-0">
           <Button variant="outline" size="sm" onClick={() => onAddFunds(goal.id)} disabled={isCompleted}>
             <DollarSign className="mr-1 h-4 w-4" /> Add Funds
           </Button>
@@ -110,6 +121,7 @@ const GoalCardComponent = React.memo(({ goal, onEdit, onDelete, onAddFunds }: { 
           </div>
         </CardFooter>
       </Card>
+    </motion.div>
   );
 });
 GoalCardComponent.displayName = 'GoalCardComponent';
@@ -186,7 +198,7 @@ export default function GoalsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Financial Goals</h1>
           <p className="text-muted-foreground">
@@ -198,7 +210,7 @@ export default function GoalsPage() {
             if (!isOpen) setCurrentGoalForForm(initialGoalFormState);
         }}>
           <DialogTrigger asChild>
-            <Button onClick={() => openForm()}>
+            <Button onClick={() => openForm()} className="w-full md:w-auto">
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Goal
             </Button>
           </DialogTrigger>
@@ -266,7 +278,6 @@ export default function GoalsPage() {
         </Dialog>
       </div>
 
-      {/* Dialog for Add Contribution */}
       <Dialog open={!!contributionGoalId} onOpenChange={(isOpen) => { if (!isOpen) setContributionGoalId(null); }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -297,7 +308,7 @@ export default function GoalsPage() {
       
       {goals.length === 0 && (
         <Card className="rounded-2xl shadow-lg">
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 p-4 sm:p-6">
             <div className="text-center text-muted-foreground">
               <Zap className="mx-auto h-12 w-12 mb-4 text-primary" />
               <p className="text-lg font-semibold">No goals set yet!</p>
@@ -307,7 +318,7 @@ export default function GoalsPage() {
         </Card>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {goals.map((goal) => (
           <GoalCardComponent 
             key={goal.id} 
@@ -321,5 +332,4 @@ export default function GoalsPage() {
     </div>
   );
 }
-
     
