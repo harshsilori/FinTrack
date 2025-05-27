@@ -13,7 +13,7 @@ import Link from 'next/link';
 
 export default function AiInsightsPage() {
   const { toast } = useToast();
-  const { assets, getAssetMarketValue } = useAssets();
+  const { assets } = useAssets();
   const [opportunities, setOpportunities] = useState<GetSavingsOpportunitiesOutput['opportunities'] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,9 +24,14 @@ export default function AiInsightsPage() {
     }
     return currentAssets
       .map(asset => {
-        const marketValue = getAssetMarketValue(asset); // Uses currentPrice which is now manual
+        const marketValue = (asset.category === 'bank' || asset.category === 'property')
+          ? asset.currentPrice
+          : asset.currentPrice * asset.quantity;
+
         let detail = `${asset.name}: ${asset.currency} ${marketValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} (Category: ${asset.category}`;
-        if (asset.tickerSymbol) detail += `, Ticker: ${asset.tickerSymbol}`;
+        if (asset.tickerSymbol) {
+          detail += `, Ticker: ${asset.tickerSymbol}`;
+        }
         detail += ')';
         return detail;
       })
@@ -37,7 +42,7 @@ export default function AiInsightsPage() {
     if (!assets || assets.length === 0) {
       toast({
         title: "No Assets Found",
-        description: "Please add some assets on the Assets page first to get insights.",
+        description: "Please add some assets on the Assets page first to get insights. You can navigate there using the sidebar.", // Simplified description
         variant: "default",
       });
       setError("No assets available to analyze. Please add assets on the Assets page.");
@@ -53,16 +58,32 @@ export default function AiInsightsPage() {
 
     try {
       const result = await getSavingsOpportunities({ assetSummary: currentAssetSummary });
-      setOpportunities(result.opportunities);
-      if (!result.opportunities || result.opportunities.length === 0) {
+      if (result && result.opportunities) {
+        setOpportunities(result.opportunities);
+        if (result.opportunities.length === 0) {
+          toast({
+            title: "No Specific Opportunities Found",
+            description: "The AI couldn't identify specific new savings or optimization opportunities from your current assets.",
+          });
+        }
+      } else {
+        setOpportunities(null);
+        setError("AI analysis returned no data. Please try again.");
         toast({
-          title: "No Specific Opportunities Found",
-          description: "The AI couldn't identify specific new savings or optimization opportunities from your current assets.",
+          title: "Analysis Incomplete",
+          description: "The AI analysis did not return any opportunities. Please try again.",
+          variant: "destructive",
         });
       }
     } catch (err) {
       console.error('Error fetching savings opportunities:', err);
-      setError('Failed to fetch savings opportunities. Please try again.');
+      let errorMessage = 'Failed to fetch savings opportunities. Please try again.';
+      if (err instanceof Error) {
+        errorMessage = `Failed to fetch savings opportunities: ${err.message}. Please try again.`;
+      } else if (typeof err === 'string') {
+        errorMessage = `Failed to fetch savings opportunities: ${err}. Please try again.`;
+      }
+      setError(errorMessage);
       toast({
         title: "Error",
         description: "An error occurred while generating insights.",
@@ -107,7 +128,8 @@ export default function AiInsightsPage() {
         </CardContent>
       </Card>
 
-      {error && (!isLoading && (!opportunities || opportunities.length === 0)) && (
+      {/* Error display section */}
+      {error && !isLoading && (!opportunities || opportunities.length === 0) && (
         <Card className="rounded-2xl shadow-lg border-destructive">
           <CardHeader className="flex flex-row items-center gap-2">
             <AlertTriangle className="h-6 w-6 text-destructive" />
@@ -117,9 +139,9 @@ export default function AiInsightsPage() {
             <p>{error}</p>
           </CardContent>
         </Card>
-      </Card>
       )}
 
+      {/* Opportunities display section */}
       {opportunities && opportunities.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-2xl font-semibold">Suggested Opportunities</h2>
@@ -146,6 +168,7 @@ export default function AiInsightsPage() {
         </div>
       )}
 
+      {/* No opportunities found and no error section */}
       { !isLoading && !error && opportunities && opportunities.length === 0 && (
          <Card className="rounded-2xl shadow-lg">
           <CardHeader>
