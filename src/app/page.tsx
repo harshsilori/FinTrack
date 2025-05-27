@@ -45,14 +45,16 @@ interface CategorySummary {
 }
 
 const PREDEFINED_COLORS = [
-  'hsl(var(--chart-1))', // primary
-  'hsl(var(--chart-2))', // accent
-  'hsl(var(--chart-3))', // blue-ish
-  'hsl(var(--chart-4))', // purple-ish
-  'hsl(var(--chart-5))', // pink-ish
-  'hsl(35, 92%, 58%)',   // orange
-  'hsl(120, 70%, 40%)',  // green
-  'hsl(190, 80%, 55%)',  // teal
+  'hsl(231, 48%, 48%)', // Primary Blue from light theme
+  'hsl(261, 44%, 58%)', // Accent Purple from light theme
+  'hsl(210, 30%, 56%)', // Chart-3 from light theme
+  'hsl(35, 92%, 58%)',  // Orange
+  'hsl(120, 70%, 40%)', // Green
+  'hsl(190, 80%, 55%)', // Teal
+  'hsl(0, 70%, 60%)',   // Reddish
+  'hsl(45, 100%, 50%)', // Yellow
+  'hsl(231, 30%, 68%)', // Chart-4 from light theme
+  'hsl(261, 30%, 78%)', // Chart-5 from light theme
 ];
 
 // Helper for pie chart label rendering
@@ -140,13 +142,15 @@ export default function HomePage() {
       return acc;
     }, {} as Record<string, number>);
 
-  const monthlyExpensePieChartData = Object.entries(monthlyExpensesByCategory)
-    .map(([name, value], index) => ({
-      name,
-      value,
-      fill: PREDEFINED_COLORS[index % PREDEFINED_COLORS.length],
-    }))
+  const tempMonthlyExpenseData = Object.entries(monthlyExpensesByCategory)
+    .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
+
+  const monthlyExpensePieChartData = tempMonthlyExpenseData.map((item, index) => ({
+    ...item,
+    fill: PREDEFINED_COLORS[index % PREDEFINED_COLORS.length],
+  }));
+
 
   const totalMonthlyIncome = monthlyTransactions
     .filter(tx => tx.type === 'income')
@@ -157,7 +161,7 @@ export default function HomePage() {
     .reduce((sum, tx) => sum + tx.amount, 0);
 
   // Data for Asset Allocation Pie Chart
-  const assetAllocationData: { name: string, value: number, currency?: string }[] = [];
+  const assetAllocationData: { name: string, value: number, currency?: string, fill?: string }[] = [];
   const aggregatedValuesByCat: Record<string, number> = {};
   const currenciesPresentInAllocation = new Set<string>();
 
@@ -169,20 +173,19 @@ export default function HomePage() {
   });
 
   let totalPortfolioValueForAllocation = 0;
-  Object.entries(aggregatedValuesByCat).forEach(([name, value], index) => {
-    if (value > 0) { // Only include categories with value
-      assetAllocationData.push({
-        name: name,
-        value: value,
-      });
+  const tempAssetAllocationData = Object.entries(aggregatedValuesByCat)
+    .map(([name, value]) => {
       totalPortfolioValueForAllocation += value;
-    }
-  });
-  // Sort for consistent color assignment
-  assetAllocationData.sort((a,b) => b.value - a.value); 
-  // Assign fill colors after sorting
-  assetAllocationData.forEach((item, index) => {
-    (item as any).fill = PREDEFINED_COLORS[index % PREDEFINED_COLORS.length];
+      return { name, value };
+    })
+    .filter(item => item.value > 0) // Only include categories with value
+    .sort((a,b) => b.value - a.value); 
+  
+  tempAssetAllocationData.forEach((item, index) => {
+    assetAllocationData.push({
+      ...item,
+      fill: PREDEFINED_COLORS[index % PREDEFINED_COLORS.length],
+    });
   });
 
 
@@ -275,7 +278,7 @@ export default function HomePage() {
                     label={renderCustomizedLabel}
                   >
                     {assetAllocationData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={(entry as any).fill} stroke="hsl(var(--background))" strokeWidth={2}/>
+                      <Cell key={`cell-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={2}/>
                     ))}
                   </Pie>
                   <Legend 
@@ -372,23 +375,23 @@ export default function HomePage() {
                       contentStyle={{ borderRadius: "0.5rem", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)"}}
                       formatter={(value: number, name: string, props) => [`${formatCurrency(value)} (${((value / totalMonthlyExpenses) * 100).toFixed(1)}%)`, name]}
                     />
-                    <Pie data={monthlyExpensePieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} labelLine={false}
+                    <Pie data={monthlyExpensePieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} labelLine={false}
                          label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
                             const RADIAN = Math.PI / 180;
-                            const radius = innerRadius + (outerRadius - innerRadius) * 1.2; 
+                            const radius = innerRadius + (outerRadius - innerRadius) * 1.3; // Adjusted label radius
                             const x = cx + radius * Math.cos(-midAngle * RADIAN);
                             const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                            const showLabel = (percent*100) > 5;
+                            const showLabel = (percent*100) > 3; // Show label for slices > 3%
                             if(!showLabel) return null;
                             return (
-                                <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs">
+                                <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-[10px]">
                                     {name} ({(percent * 100).toFixed(0)}%)
                                 </text>
                             );
                         }}
                     >
                       {monthlyExpensePieChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={2}/>
+                        <Cell key={`cell-expense-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={2}/>
                       ))}
                     </Pie>
                   </PieChart>
