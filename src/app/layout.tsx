@@ -8,7 +8,8 @@ import { AssetProvider } from '@/contexts/AssetContext';
 import { GoalProvider } from '@/contexts/GoalContext';
 import { TransactionProvider } from '@/contexts/TransactionContext';
 import { DebtProvider } from '@/contexts/DebtContext';
-import { BudgetProvider } from '@/contexts/BudgetContext'; // Import BudgetProvider
+import { BudgetProvider } from '@/contexts/BudgetContext';
+import { AuthProvider } from '@/contexts/AuthContext'; // Import AuthProvider
 import Script from 'next/script';
 
 
@@ -50,19 +51,21 @@ export default function RootLayout({
         </Script>
       </head>
       <body className={`${roboto.variable} font-sans antialiased`}>
-        <AssetProvider>
-          <GoalProvider>
-            <TransactionProvider>
-              <DebtProvider>
-                <BudgetProvider> {/* Wrap with BudgetProvider */}
-                  <AppShell>
-                    {children}
-                  </AppShell>
-                </BudgetProvider>
-              </DebtProvider>
-            </TransactionProvider>
-          </GoalProvider>
-        </AssetProvider>
+        <AuthProvider> {/* Wrap with AuthProvider */}
+          <AssetProvider>
+            <GoalProvider>
+              <TransactionProvider>
+                <DebtProvider>
+                  <BudgetProvider>
+                    <AppShell>
+                      {children}
+                    </AppShell>
+                  </BudgetProvider>
+                </DebtProvider>
+              </TransactionProvider>
+            </GoalProvider>
+          </AssetProvider>
+        </AuthProvider>
         <Toaster />
       </body>
     </html>

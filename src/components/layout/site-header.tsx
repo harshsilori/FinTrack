@@ -1,17 +1,29 @@
+
+'use client';
+
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { UserCircle, Bell } from "lucide-react";
+import { UserCircle, Bell, LogIn, LogOut, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function SiteHeader() {
+  const { currentUser, logOutUser, loadingAuthState } = useAuth();
+
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between p-4 sm:p-6 lg:p-8">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="md:hidden" />
           <Link href="/" className="flex items-center gap-2">
-            {/* Placeholder for an app logo if available */}
-            {/* <Coins className="h-6 w-6 text-primary" /> */}
             <svg
               width="32"
               height="32"
@@ -51,9 +63,44 @@ export function SiteHeader() {
           <Button variant="ghost" size="icon" aria-label="Notifications">
             <Bell className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon" aria-label="User Profile">
-            <UserCircle className="h-6 w-6" />
-          </Button>
+          {loadingAuthState ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : currentUser ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="User Profile">
+                  <UserCircle className="h-6 w-6" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">
+                      My Account
+                    </p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {currentUser.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => {/* TODO: Navigate to profile settings */}}>
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={logOutUser}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button variant="ghost" asChild>
+              <Link href="/auth">
+                <LogIn className="mr-2 h-4 w-4" />
+                Login
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
     </header>
