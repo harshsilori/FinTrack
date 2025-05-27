@@ -70,10 +70,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0, x: -30 }} // Changed for more noticeable animation
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 30 }}    // Changed for more noticeable animation
+              transition={{ duration: 0.5 }} // Increased duration
             >
               {children}
             </motion.div>

@@ -38,6 +38,7 @@ const GoalCardComponent = React.memo(function GoalCardComponent({ goal, onEdit, 
   const progressPercentage = goal.targetAmount > 0 ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100) : 0;
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [clientFormattedTargetDate, setClientFormattedTargetDate] = useState<string | null>(null);
 
   useEffect(() => {
     setIsCompleted(goal.currentAmount >= goal.targetAmount);
@@ -45,11 +46,14 @@ const GoalCardComponent = React.memo(function GoalCardComponent({ goal, onEdit, 
       const target = parseISO(goal.targetDate);
       if (isValid(target)) {
         setDaysLeft(differenceInDays(target, new Date()));
+        setClientFormattedTargetDate(format(target, "PPP"));
       } else {
         setDaysLeft(null);
+        setClientFormattedTargetDate(null);
       }
     } else {
       setDaysLeft(null);
+      setClientFormattedTargetDate(null);
     }
   }, [goal.targetDate, goal.currentAmount, goal.targetAmount]);
 
@@ -66,6 +70,12 @@ const GoalCardComponent = React.memo(function GoalCardComponent({ goal, onEdit, 
           <div>
             <CardTitle className="text-lg">{goal.name}</CardTitle>
             <CardDescription>Target: {formatCurrency(goal.targetAmount)}</CardDescription>
+            {clientFormattedTargetDate && !isCompleted && (
+              <CardDescription className="text-xs">Target Date: {clientFormattedTargetDate}</CardDescription>
+            )}
+             {isCompleted && (
+              <CardDescription className="text-xs text-green-600">Achieved!</CardDescription>
+            )}
           </div>
           {isCompleted ? <CheckCircle className="h-8 w-8 text-green-500" /> : iconNode}
         </div>
@@ -132,7 +142,7 @@ export default function GoalsPage() {
       name: currentGoalForForm.name,
       targetAmount: Number(currentGoalForForm.targetAmount),
       currentAmount: Number(currentGoalForForm.currentAmount || 0),
-      targetDate: currentGoalForForm.targetDate || undefined,
+      targetDate: currentGoalForForm.targetDate || undefined, // Already in yyyy-MM-dd
       icon: currentGoalForForm.icon || 'Target',
     };
 
