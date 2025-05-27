@@ -11,7 +11,7 @@ interface OnboardingStep {
   title: string;
   description: string;
   imageSrc: string;
-  imageHint: string;
+  // imageHint removed
 }
 
 const onboardingSteps: OnboardingStep[] = [
@@ -19,31 +19,26 @@ const onboardingSteps: OnboardingStep[] = [
     title: "Welcome to FinTrack Mobile!",
     description: "Your personal finance companion. Let's take a quick tour of what you can do.",
     imageSrc: "https://placehold.co/600x400.png",
-    imageHint: "welcome abstract",
   },
   {
     title: "All Your Finances in One Place",
     description: "Manually track assets like bank accounts, stocks, and crypto. Log your income and expenses with ease.",
     imageSrc: "https://placehold.co/600x400.png",
-    imageHint: "finance chart",
   },
   {
     title: "Budget Smarter, Reach Goals Faster",
     description: "Create budgets to manage spending and set financial goals to save for what matters most.",
     imageSrc: "https://placehold.co/600x400.png",
-    imageHint: "piggybank goal",
   },
   {
     title: "Unlock Financial Wisdom",
     description: "Get AI-driven insights on savings opportunities and assess your financial health.",
     imageSrc: "https://placehold.co/600x400.png",
-    imageHint: "brain lightbulb",
   },
   {
     title: "You're All Set!",
     description: "You're ready to take control of your finances. Tip: You can load sample data from the Settings page to explore features quickly.",
     imageSrc: "https://placehold.co/600x400.png",
-    imageHint: "rocket launch",
   },
 ];
 
@@ -83,7 +78,7 @@ export function OnboardingModal({ isOpen, onComplete }: OnboardingModalProps) {
             layout="fill"
             objectFit="cover"
             className="rounded-t-lg"
-            data-ai-hint={step.imageHint}
+            // data-ai-hint removed
           />
         </div>
         <DialogHeader className="p-6 text-left">
