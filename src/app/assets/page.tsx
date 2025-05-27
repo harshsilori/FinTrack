@@ -5,20 +5,20 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogTrigger, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, ExternalLink, AlertTriangle, Search } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, ExternalLink, AlertTriangle, Search, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 // Chart related imports commented out as they are not currently used after manual price entry switch
 // import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 // import { BarChart, Line, LineChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { useToast } from "@/hooks/use-toast";
 import { useAssets, type Asset as ContextAsset, type AssetCategory } from '@/contexts/AssetContext';
-import { AnimatePresence, motion } from 'framer-motion';
-
+// import { fetchAssetPrice, type PriceFetchResult, searchTickerSymbols, TickerSuggestion } from '@/services/marketService'; // Commented out as per manual entry
 
 const assetIcons: Record<AssetCategory | 'overview', React.ReactNode> = {
   overview: <WalletCards className="h-5 w-5 text-muted-foreground" />,
@@ -37,6 +37,7 @@ const initialAssetFormState: Partial<ContextAsset> = {
   purchasePrice: 0,
   currentPrice: 0,
   tickerSymbol: '',
+  // priceFetchError: undefined, // Removed as per manual entry
 };
 
 const supportedCurrencies = [
@@ -69,13 +70,15 @@ const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: Con
   const isTrackableAsset = asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund';
   
   const [clientFormattedLastUpdated, setClientFormattedLastUpdated] = useState<string | null>(null);
-  
+  // const [clientFormattedLastPriceUpdate, setClientFormattedLastPriceUpdate] = useState<string | null>(null); // Removed as per manual entry
+
   useEffect(() => {
     if (asset.lastUpdated) {
       setClientFormattedLastUpdated(new Date(asset.lastUpdated).toLocaleDateString());
     } else {
       setClientFormattedLastUpdated(null);
     }
+    // Price update formatting removed
   }, [asset.lastUpdated]);
 
 
@@ -97,57 +100,62 @@ const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: Con
   };
 
   return (
-    <Card className="rounded-2xl shadow-lg flex flex-col">
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div>
-          <CardTitle className="text-lg">{asset.name}</CardTitle>
-          <CardDescription className="capitalize">
-            {categoryDisplayNames[asset.category]} {asset.tickerSymbol && `(${asset.tickerSymbol})`} - {asset.currency}
-          </CardDescription>
-        </div>
-        {assetIcons[asset.category] ? React.cloneElement(assetIcons[asset.category] as React.ReactElement, { className: "h-8 w-8" }) : <WalletCards className="h-8 w-8" />}
-      </CardHeader>
-      <CardContent className="flex-grow space-y-3">
-        <div className="space-y-1">
-          <p className="text-2xl font-semibold">{formatCurrency(marketValue, asset.currency)}</p>
-          <p className="text-xs text-muted-foreground">
-              {asset.category === 'bank' || asset.category === 'property'
-              ? 'Current Value'
-              : `${(asset.quantity || 0).toLocaleString()} units @ ${formatCurrency(asset.currentPrice, asset.currency)}/unit`
-              }
-          </p>
-        </div>
+    <motion.div
+      className="h-full" 
+      whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+      whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+    >
+      <Card className="rounded-2xl shadow-lg flex flex-col h-full">
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle className="text-lg">{asset.name}</CardTitle>
+            <CardDescription className="capitalize">
+              {categoryDisplayNames[asset.category]} {asset.tickerSymbol && `(${asset.tickerSymbol})`} - {asset.currency}
+            </CardDescription>
+          </div>
+          {assetIcons[asset.category] ? React.cloneElement(assetIcons[asset.category] as React.ReactElement, { className: "h-8 w-8" }) : <WalletCards className="h-8 w-8" />}
+        </CardHeader>
+        <CardContent className="flex-grow space-y-3">
+          <div className="space-y-1">
+            <p className="text-2xl font-semibold">{formatCurrency(marketValue, asset.currency)}</p>
+            <p className="text-xs text-muted-foreground">
+                {asset.category === 'bank' || asset.category === 'property'
+                ? 'Current Value'
+                : `${(asset.quantity || 0).toLocaleString()} units @ ${formatCurrency(asset.currentPrice, asset.currency)}/unit`
+                }
+            </p>
+          </div>
 
-        {isTrackableAsset && asset.purchasePrice !== undefined && (
-          <>
-            <div className="text-sm">
-              <span className="font-medium">All-Time Gain/Loss: </span>
-              <span className={allTimeGainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                {allTimeGainLoss >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1"/> : <AlertTriangle className="inline h-4 w-4 mr-1"/>}
-                {allTimeGainLoss >= 0 ? '+' : ''}{formatCurrency(allTimeGainLoss, asset.currency)} ({!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent) ? allTimeGainLossPercent.toFixed(2) : (asset.purchasePrice === 0 && allTimeGainLoss !== 0 ? "N/A" : "0.00")}%)
-              </span>
-            </div>
-             <p className="text-xs text-muted-foreground">
-               Purchase Price: {formatCurrency(asset.purchasePrice, asset.currency)}/unit
-             </p>
-          </>
-        )}
-         <p className="text-xs text-muted-foreground pt-2">
-            {clientFormattedLastUpdated !== null
-              ? `Details last saved: ${clientFormattedLastUpdated}`
-              : (asset.lastUpdated ? "Loading save date..." : "")
-            }
-         </p>
-      </CardContent>
-      <CardFooter className="flex justify-end items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={() => onEdit(asset)} aria-label="Edit asset">
-              <Edit3 className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => onDelete(asset.id!)} aria-label="Delete asset">
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-      </CardFooter>
-    </Card>
+          {isTrackableAsset && asset.purchasePrice !== undefined && (
+            <>
+              <div className="text-sm">
+                <span className="font-medium">All-Time Gain/Loss: </span>
+                <span className={allTimeGainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                  {allTimeGainLoss >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1"/> : <AlertTriangle className="inline h-4 w-4 mr-1"/>}
+                  {allTimeGainLoss >= 0 ? '+' : ''}{formatCurrency(allTimeGainLoss, asset.currency)} ({!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent) ? allTimeGainLossPercent.toFixed(2) : (asset.purchasePrice === 0 && allTimeGainLoss !== 0 ? "N/A" : "0.00")}%)
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Purchase Price: {formatCurrency(asset.purchasePrice, asset.currency)}/unit
+              </p>
+            </>
+          )}
+          <p className="text-xs text-muted-foreground pt-2">
+            {/* Price fetch error display removed */}
+            Details last saved: {clientFormattedLastUpdated !== null ? clientFormattedLastUpdated : (asset.lastUpdated ? "Loading save date..." : "")}
+          </p>
+        </CardContent>
+        <CardFooter className="flex justify-end items-center gap-1">
+              {/* Refresh button removed */}
+              <Button variant="ghost" size="icon" onClick={() => onEdit(asset)} aria-label="Edit asset">
+                <Edit3 className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => onDelete(asset.id!)} aria-label="Delete asset">
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+        </CardFooter>
+      </Card>
+    </motion.div>
   );
 });
 AssetCardComponent.displayName = 'AssetCardComponent';
@@ -187,7 +195,7 @@ export default function AssetsPage() {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return allAssets; 
+    return []; // Overview tab doesn't list individual assets here
   }, [allAssets, activeTab]);
 
   const openForm = (asset?: ContextAsset) => {
@@ -198,7 +206,7 @@ export default function AssetsPage() {
       const newInitialState: Partial<ContextAsset> = {
         ...initialAssetFormState,
         category: prefilledCategory as AssetCategory,
-        currency: 'USD',
+        currency: 'USD', // Default currency
         currentPrice: 0,
       };
        if (prefilledCategory === 'bank' || prefilledCategory === 'property') {
@@ -254,7 +262,7 @@ export default function AssetsPage() {
       updateAsset({ id: currentAssetForForm.id, ...assetPayload });
       toast({ title: "Asset Updated", description: `${assetPayload.name} has been updated.` });
     } else { 
-      const addedAsset = addAsset(assetPayload as Omit<ContextAsset, 'id' | 'lastUpdated'>);
+      addAsset(assetPayload as Omit<ContextAsset, 'id' | 'lastUpdated'>);
       toast({ title: "Asset Added", description: `${assetPayload.name} has been added.` });
     }
     setIsFormOpen(false);
@@ -376,7 +384,7 @@ export default function AssetsPage() {
           )}
         </Card>
       );
-    } else { // Category specific tab
+    } else { 
       const category = tab as AssetCategory;
       const assetsForThisCategory = displayedAssets.filter(asset => asset.category === category);
       return (
@@ -505,7 +513,7 @@ export default function AssetsPage() {
                         value={currentAssetForForm?.tickerSymbol || ''}
                         onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, tickerSymbol: e.target.value.toUpperCase() }))}
                         className="col-span-3"
-                        placeholder={
+                         placeholder={
                             currentAssetForForm?.category === 'stock' ? 'e.g., AAPL' :
                             currentAssetForForm?.category === 'crypto' ? 'e.g., BTC' :
                             currentAssetForForm?.category === 'mutualfund' ? 'e.g., VOO' :
@@ -580,9 +588,8 @@ export default function AssetsPage() {
             ))}
         </TabsList>
         
-        <div className="relative mt-2"> {/* Container for animated content */}
+        <div className="relative mt-2"> 
           <AnimatePresence mode="wait">
-            {/* Conditionally render motion.div for each tab's content */}
             {activeTab === 'overview' && (
               <motion.div
                 key="overview-content"
@@ -618,4 +625,3 @@ export default function AssetsPage() {
     </div>
   );
 }
-

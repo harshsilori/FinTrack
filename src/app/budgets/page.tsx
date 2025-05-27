@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTransactions, type Transaction } from '@/contexts/TransactionContext';
 import { useBudgets, type Budget, budgetPeriods, budgetCategories } from '@/contexts/BudgetContext'; // Import from BudgetContext
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
+import { motion } from 'framer-motion';
 
 
 const BudgetCard = React.memo(({ 
@@ -79,39 +80,45 @@ const BudgetCard = React.memo(({
 
 
   return (
-    <Card key={budget.id} className="rounded-2xl shadow-lg flex flex-col">
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="text-lg">{budget.name}</CardTitle>
-            <CardDescription className="capitalize">{budget.category} - {budgetPeriods.find(p=>p.value === budget.period)?.label} {budget.period === 'custom' && budget.customPeriodDetails ? `(${budget.customPeriodDetails})` : ''}</CardDescription>
-          </div>
-          <PiggyBank className="h-8 w-8 text-primary" />
-        </div>
-      </CardHeader>
-      <CardContent className="flex-grow space-y-2">
-        {isComplexPeriod ? (
-          <p className="text-sm text-muted-foreground">Manual tracking needed for spent amount in this period.</p>
-        ) : (
-          <>
-            <div className="flex justify-between items-baseline">
-              <p className="text-2xl font-semibold">{formatCurrency(calculatedSpent)}</p>
-              <p className="text-sm text-muted-foreground">of {formatCurrency(budget.amount)}</p>
+    <motion.div
+      className="h-full"
+      whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+      whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+    >
+      <Card key={budget.id} className="rounded-2xl shadow-lg flex flex-col h-full">
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-lg">{budget.name}</CardTitle>
+              <CardDescription className="capitalize">{budget.category} - {budgetPeriods.find(p=>p.value === budget.period)?.label} {budget.period === 'custom' && budget.customPeriodDetails ? `(${budget.customPeriodDetails})` : ''}</CardDescription>
             </div>
-            <Progress value={spentPercentage} className="h-3 rounded-lg" indicatorClassName={getProgressColor(spentPercentage)} />
-            <p className="text-xs text-muted-foreground text-right">{spentPercentage.toFixed(0)}% spent</p>
-          </>
-        )}
-      </CardContent>
-      <CardFooter className="flex justify-end gap-2">
-        <Button variant="ghost" size="icon" onClick={() => onEdit(budget)} aria-label="Edit budget">
-          <Edit3 className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={() => onDelete(budget.id)} aria-label="Delete budget">
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
-      </CardFooter>
-    </Card>
+            <PiggyBank className="h-8 w-8 text-primary" />
+          </div>
+        </CardHeader>
+        <CardContent className="flex-grow space-y-2">
+          {isComplexPeriod ? (
+            <p className="text-sm text-muted-foreground">Manual tracking needed for spent amount in this period.</p>
+          ) : (
+            <>
+              <div className="flex justify-between items-baseline">
+                <p className="text-2xl font-semibold">{formatCurrency(calculatedSpent)}</p>
+                <p className="text-sm text-muted-foreground">of {formatCurrency(budget.amount)}</p>
+              </div>
+              <Progress value={spentPercentage} className="h-3 rounded-lg" indicatorClassName={getProgressColor(spentPercentage)} />
+              <p className="text-xs text-muted-foreground text-right">{spentPercentage.toFixed(0)}% spent</p>
+            </>
+          )}
+        </CardContent>
+        <CardFooter className="flex justify-end gap-2">
+          <Button variant="ghost" size="icon" onClick={() => onEdit(budget)} aria-label="Edit budget">
+            <Edit3 className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => onDelete(budget.id)} aria-label="Delete budget">
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </CardFooter>
+      </Card>
+    </motion.div>
   );
 });
 BudgetCard.displayName = 'BudgetCard';

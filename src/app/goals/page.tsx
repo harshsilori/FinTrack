@@ -14,6 +14,7 @@ import { useGoals, type Goal as ContextGoal } from '@/contexts/GoalContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, differenceInDays, isValid, parseISO } from 'date-fns';
+import { motion } from 'framer-motion';
 
 const goalIcons: Record<string, React.ReactNode> = {
   Target: <Target className="h-8 w-8 text-primary" />,
@@ -64,52 +65,58 @@ const GoalCardComponent = ({ goal, onEdit, onDelete, onAddFunds }: { goal: Conte
   };
 
   return (
-    <Card className={`rounded-2xl shadow-lg flex flex-col ${isCompleted ? 'bg-green-50 dark:bg-green-900/30 border-green-500' : ''}`}>
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="text-lg">{goal.name}</CardTitle>
-            <CardDescription>Target: {formatCurrency(goal.targetAmount)}</CardDescription>
-            {clientFormattedTargetDate && !isCompleted && (
-              <CardDescription className="text-xs">Target Date: {clientFormattedTargetDate}</CardDescription>
-            )}
-             {isCompleted && (
-              <CardDescription className="text-xs text-green-600">Achieved!</CardDescription>
-            )}
+    <motion.div
+      className="h-full"
+      whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+      whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+    >
+      <Card className={`rounded-2xl shadow-lg flex flex-col h-full ${isCompleted ? 'bg-green-50 dark:bg-green-900/30 border-green-500' : ''}`}>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-lg">{goal.name}</CardTitle>
+              <CardDescription>Target: {formatCurrency(goal.targetAmount)}</CardDescription>
+              {clientFormattedTargetDate && !isCompleted && (
+                <CardDescription className="text-xs">Target Date: {clientFormattedTargetDate}</CardDescription>
+              )}
+              {isCompleted && (
+                <CardDescription className="text-xs text-green-600">Achieved!</CardDescription>
+              )}
+            </div>
+            {isCompleted ? <CheckCircle className="h-8 w-8 text-green-500" /> : iconNode}
           </div>
-          {isCompleted ? <CheckCircle className="h-8 w-8 text-green-500" /> : iconNode}
-        </div>
-      </CardHeader>
-      <CardContent className="flex-grow space-y-3">
-        <div className="flex justify-between items-baseline">
-          <p className="text-2xl font-semibold">{formatCurrency(goal.currentAmount)}</p>
-          <p className="text-sm text-muted-foreground">of {formatCurrency(goal.targetAmount)}</p>
-        </div>
-        <Progress value={progressPercentage} className="h-3 rounded-lg" indicatorClassName={isCompleted ? 'bg-green-500' : (progressPercentage > 70 ? 'bg-blue-500' : 'bg-blue-400')} />
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>{progressPercentage.toFixed(0)}% saved</span>
-          {daysLeft !== null && !isCompleted && (
-            <span>
-              {daysLeft > 0 ? `${daysLeft} days left` : (daysLeft === 0 ? `Due today` : `${Math.abs(daysLeft)} days overdue`)}
-            </span>
-          )}
-           {isCompleted && <span className="text-green-600 font-semibold">Goal Achieved!</span>}
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-between items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => onAddFunds(goal.id)} disabled={isCompleted}>
-           <DollarSign className="mr-1 h-4 w-4" /> Add Funds
-        </Button>
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={() => onEdit(goal)} aria-label="Edit goal">
-            <Edit3 className="h-4 w-4" />
+        </CardHeader>
+        <CardContent className="flex-grow space-y-3">
+          <div className="flex justify-between items-baseline">
+            <p className="text-2xl font-semibold">{formatCurrency(goal.currentAmount)}</p>
+            <p className="text-sm text-muted-foreground">of {formatCurrency(goal.targetAmount)}</p>
+          </div>
+          <Progress value={progressPercentage} className="h-3 rounded-lg" indicatorClassName={isCompleted ? 'bg-green-500' : (progressPercentage > 70 ? 'bg-blue-500' : 'bg-blue-400')} />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{progressPercentage.toFixed(0)}% saved</span>
+            {daysLeft !== null && !isCompleted && (
+              <span>
+                {daysLeft > 0 ? `${daysLeft} days left` : (daysLeft === 0 ? `Due today` : `${Math.abs(daysLeft)} days overdue`)}
+              </span>
+            )}
+            {isCompleted && <span className="text-green-600 font-semibold">Goal Achieved!</span>}
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-between items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => onAddFunds(goal.id)} disabled={isCompleted}>
+            <DollarSign className="mr-1 h-4 w-4" /> Add Funds
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => onDelete(goal.id)} aria-label="Delete goal">
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
-      </CardFooter>
-    </Card>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" onClick={() => onEdit(goal)} aria-label="Edit goal">
+              <Edit3 className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => onDelete(goal.id)} aria-label="Delete goal">
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
+    </motion.div>
   );
 };
 

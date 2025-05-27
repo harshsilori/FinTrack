@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { PlusCircle, Edit3, Trash2, CreditCard, DollarSign, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useDebts, type Debt as ContextDebt } from '@/contexts/DebtContext';
+import { motion } from 'framer-motion';
 
 const initialDebtFormState: Partial<ContextDebt> = {
   name: '',
@@ -30,44 +31,50 @@ const DebtCardComponent = ({ debt, onEdit, onDelete, onMakePayment }: { debt: Co
   };
 
   return (
-    <Card className={`rounded-2xl shadow-lg flex flex-col ${isPaidOff ? 'bg-green-50 dark:bg-green-900/30 border-green-500' : ''}`}>
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="text-lg">{debt.name}</CardTitle>
-            <CardDescription>
-              {isPaidOff ? 'Paid Off!' : `Remaining: ${formatCurrency(remainingBalance)}`}
-            </CardDescription>
-            {debt.interestRate && <CardDescription className="text-xs">Interest Rate: {debt.interestRate}%</CardDescription>}
+    <motion.div
+      className="h-full"
+      whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+      whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+    >
+      <Card className={`rounded-2xl shadow-lg flex flex-col h-full ${isPaidOff ? 'bg-green-50 dark:bg-green-900/30 border-green-500' : ''}`}>
+        <CardHeader>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-lg">{debt.name}</CardTitle>
+              <CardDescription>
+                {isPaidOff ? 'Paid Off!' : `Remaining: ${formatCurrency(remainingBalance)}`}
+              </CardDescription>
+              {debt.interestRate && <CardDescription className="text-xs">Interest Rate: {debt.interestRate}%</CardDescription>}
+            </div>
+            {isPaidOff ? <CheckCircle className="h-8 w-8 text-green-500" /> : <CreditCard className="h-8 w-8 text-primary" />}
           </div>
-          {isPaidOff ? <CheckCircle className="h-8 w-8 text-green-500" /> : <CreditCard className="h-8 w-8 text-primary" />}
-        </div>
-      </CardHeader>
-      <CardContent className="flex-grow space-y-3">
-        <div className="flex justify-between items-baseline">
-          <p className="text-2xl font-semibold">{formatCurrency(debt.amountPaid)}</p>
-          <p className="text-sm text-muted-foreground">of {formatCurrency(debt.totalAmount)} paid</p>
-        </div>
-        <Progress value={progressPercentage} className="h-3 rounded-lg" indicatorClassName={isPaidOff ? 'bg-green-500' : (progressPercentage > 70 ? 'bg-blue-500' : 'bg-blue-400')} />
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>{progressPercentage.toFixed(0)}% paid off</span>
-          {debt.minimumPayment && !isPaidOff && <span>Min. Payment: {formatCurrency(debt.minimumPayment)}</span>}
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-between items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => onMakePayment(debt)} disabled={isPaidOff}>
-           <DollarSign className="mr-1 h-4 w-4" /> Make Payment
-        </Button>
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={() => onEdit(debt)} aria-label="Edit debt">
-            <Edit3 className="h-4 w-4" />
+        </CardHeader>
+        <CardContent className="flex-grow space-y-3">
+          <div className="flex justify-between items-baseline">
+            <p className="text-2xl font-semibold">{formatCurrency(debt.amountPaid)}</p>
+            <p className="text-sm text-muted-foreground">of {formatCurrency(debt.totalAmount)} paid</p>
+          </div>
+          <Progress value={progressPercentage} className="h-3 rounded-lg" indicatorClassName={isPaidOff ? 'bg-green-500' : (progressPercentage > 70 ? 'bg-blue-500' : 'bg-blue-400')} />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{progressPercentage.toFixed(0)}% paid off</span>
+            {debt.minimumPayment && !isPaidOff && <span>Min. Payment: {formatCurrency(debt.minimumPayment)}</span>}
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-between items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => onMakePayment(debt)} disabled={isPaidOff}>
+            <DollarSign className="mr-1 h-4 w-4" /> Make Payment
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => onDelete(debt.id)} aria-label="Delete debt">
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
-      </CardFooter>
-    </Card>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" onClick={() => onEdit(debt)} aria-label="Edit debt">
+              <Edit3 className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => onDelete(debt.id)} aria-label="Delete debt">
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
+    </motion.div>
   );
 };
 
