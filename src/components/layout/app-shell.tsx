@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -13,8 +14,11 @@ import { SiteHeader } from '@/components/layout/site-header';
 import { MainNav } from '@/components/layout/main-nav';
 import { NAV_LINKS, BOTTOM_NAV_LINKS } from '@/constants/nav-links';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import { usePathname } from 'next/navigation';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   return (
     <SidebarProvider defaultOpen>
       <Sidebar className="border-r" collapsible="icon">
@@ -63,7 +67,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <SidebarInset className="flex flex-col">
         <SiteHeader />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          {children}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </SidebarInset>
     </SidebarProvider>

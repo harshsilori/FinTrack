@@ -33,6 +33,78 @@ const initialGoalFormState: Partial<ContextGoal> = {
   icon: 'Target',
 };
 
+
+const GoalCardComponent = React.memo(function GoalCardComponent({ goal, onEdit, onDelete, onAddFunds }: { goal: ContextGoal; onEdit: (goal: ContextGoal) => void; onDelete: (id: string) => void; onAddFunds: (id: string) => void; }) {
+  const progressPercentage = goal.targetAmount > 0 ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100) : 0;
+  const [daysLeft, setDaysLeft] = useState<number | null>(null);
+  const [isCompleted, setIsCompleted] = useState(false);
+
+  useEffect(() => {
+    setIsCompleted(goal.currentAmount >= goal.targetAmount);
+    if (goal.targetDate) {
+      const target = parseISO(goal.targetDate);
+      if (isValid(target)) {
+        setDaysLeft(differenceInDays(target, new Date()));
+      } else {
+        setDaysLeft(null);
+      }
+    } else {
+      setDaysLeft(null);
+    }
+  }, [goal.targetDate, goal.currentAmount, goal.targetAmount]);
+
+  const iconNode = goalIcons[goal.icon || 'Default'] || goalIcons.Default;
+  
+  const formatCurrency = (value: number, currencyCode: string = 'USD') => {
+    return value.toLocaleString(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  return (
+    <Card className={`rounded-2xl shadow-lg flex flex-col ${isCompleted ? 'bg-green-50 dark:bg-green-900/30 border-green-500' : ''}`}>
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="text-lg">{goal.name}</CardTitle>
+            <CardDescription>Target: {formatCurrency(goal.targetAmount)}</CardDescription>
+          </div>
+          {isCompleted ? <CheckCircle className="h-8 w-8 text-green-500" /> : iconNode}
+        </div>
+      </CardHeader>
+      <CardContent className="flex-grow space-y-3">
+        <div className="flex justify-between items-baseline">
+          <p className="text-2xl font-semibold">{formatCurrency(goal.currentAmount)}</p>
+          <p className="text-sm text-muted-foreground">of {formatCurrency(goal.targetAmount)}</p>
+        </div>
+        <Progress value={progressPercentage} className="h-3 rounded-lg" indicatorClassName={isCompleted ? 'bg-green-500' : (progressPercentage > 70 ? 'bg-blue-500' : 'bg-blue-400')} />
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>{progressPercentage.toFixed(0)}% saved</span>
+          {daysLeft !== null && !isCompleted && (
+            <span>
+              {daysLeft > 0 ? `${daysLeft} days left` : (daysLeft === 0 ? `Due today` : `${Math.abs(daysLeft)} days overdue`)}
+            </span>
+          )}
+           {isCompleted && <span className="text-green-600 font-semibold">Goal Achieved!</span>}
+        </div>
+      </CardContent>
+      <CardFooter className="flex justify-between items-center gap-2">
+        <Button variant="outline" size="sm" onClick={() => onAddFunds(goal.id)} disabled={isCompleted}>
+           <DollarSign className="mr-1 h-4 w-4" /> Add Funds
+        </Button>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="icon" onClick={() => onEdit(goal)} aria-label="Edit goal">
+            <Edit3 className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => onDelete(goal.id)} aria-label="Delete goal">
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      </CardFooter>
+    </Card>
+  );
+});
+GoalCardComponent.displayName = 'GoalCardComponent';
+
+
 export default function GoalsPage() {
   const { toast } = useToast();
   const { goals, addGoal, updateGoal, deleteGoal, addContribution } = useGoals();
@@ -98,71 +170,6 @@ export default function GoalsPage() {
   
   const formatCurrency = (value: number, currencyCode: string = 'USD') => {
     return value.toLocaleString(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
-  const GoalCardComponent = ({ goal }: { goal: ContextGoal }) => {
-    const progressPercentage = goal.targetAmount > 0 ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100) : 0;
-    const [daysLeft, setDaysLeft] = useState<number | null>(null);
-    const [isCompleted, setIsCompleted] = useState(false);
-
-    useEffect(() => {
-      setIsCompleted(goal.currentAmount >= goal.targetAmount);
-      if (goal.targetDate) {
-        const target = parseISO(goal.targetDate);
-        if (isValid(target)) {
-          setDaysLeft(differenceInDays(target, new Date()));
-        } else {
-          setDaysLeft(null);
-        }
-      } else {
-        setDaysLeft(null);
-      }
-    }, [goal.targetDate, goal.currentAmount, goal.targetAmount]);
-
-    const iconNode = goalIcons[goal.icon || 'Default'] || goalIcons.Default;
-
-    return (
-      <Card className={`rounded-2xl shadow-lg flex flex-col ${isCompleted ? 'bg-green-50 dark:bg-green-900/30 border-green-500' : ''}`}>
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle className="text-lg">{goal.name}</CardTitle>
-              <CardDescription>Target: {formatCurrency(goal.targetAmount)}</CardDescription>
-            </div>
-            {isCompleted ? <CheckCircle className="h-8 w-8 text-green-500" /> : iconNode}
-          </div>
-        </CardHeader>
-        <CardContent className="flex-grow space-y-3">
-          <div className="flex justify-between items-baseline">
-            <p className="text-2xl font-semibold">{formatCurrency(goal.currentAmount)}</p>
-            <p className="text-sm text-muted-foreground">of {formatCurrency(goal.targetAmount)}</p>
-          </div>
-          <Progress value={progressPercentage} className="h-3 rounded-lg" indicatorClassName={isCompleted ? 'bg-green-500' : (progressPercentage > 70 ? 'bg-blue-500' : 'bg-blue-400')} />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{progressPercentage.toFixed(0)}% saved</span>
-            {daysLeft !== null && !isCompleted && (
-              <span>
-                {daysLeft > 0 ? `${daysLeft} days left` : (daysLeft === 0 ? `Due today` : `${Math.abs(daysLeft)} days overdue`)}
-              </span>
-            )}
-             {isCompleted && <span className="text-green-600 font-semibold">Goal Achieved!</span>}
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-between items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => openContributionModal(goal.id)} disabled={isCompleted}>
-             <DollarSign className="mr-1 h-4 w-4" /> Add Funds
-          </Button>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="icon" onClick={() => openForm(goal)} aria-label="Edit goal">
-              <Edit3 className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => handleDeleteGoal(goal.id)} aria-label="Delete goal">
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-          </div>
-        </CardFooter>
-      </Card>
-    );
   };
 
   const availableIcons = Object.keys(goalIcons).filter(icon => icon !== 'Default');
@@ -292,7 +299,13 @@ export default function GoalsPage() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {goals.map((goal) => (
-          <GoalCardComponent key={goal.id} goal={goal} />
+          <GoalCardComponent 
+            key={goal.id} 
+            goal={goal} 
+            onEdit={openForm}
+            onDelete={handleDeleteGoal}
+            onAddFunds={openContributionModal}
+          />
         ))}
       </div>
     </div>

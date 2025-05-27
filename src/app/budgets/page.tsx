@@ -31,6 +31,48 @@ const budgetPeriods = [
 
 const budgetCategories = ['Groceries', 'Dining Out', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Other'];
 
+const BudgetCard = React.memo(function BudgetCard({ budget, onEdit, onDelete }: { budget: Budget; onEdit: (budget: Budget) => void; onDelete: (id: string) => void; }) {
+  const spentPercentage = budget.amount > 0 ? Math.min((budget.spent / budget.amount) * 100, 100) : 0;
+  
+  const getProgressColor = (percentage: number) => {
+    if (percentage > 90) return 'bg-red-500';
+    if (percentage > 70) return 'bg-yellow-500';
+    return 'bg-green-500';
+  };
+
+  return (
+    <Card key={budget.id} className="rounded-2xl shadow-lg flex flex-col">
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="text-lg">{budget.name}</CardTitle>
+            <CardDescription className="capitalize">{budget.category} - {budgetPeriods.find(p=>p.value === budget.period)?.label} {budget.period === 'custom' ? `(${budget.customPeriodDetails})` : ''}</CardDescription>
+          </div>
+          <PiggyBank className="h-8 w-8 text-primary" />
+        </div>
+      </CardHeader>
+      <CardContent className="flex-grow space-y-2">
+        <div className="flex justify-between items-baseline">
+          <p className="text-2xl font-semibold">${budget.spent.toLocaleString()}</p>
+          <p className="text-sm text-muted-foreground">of ${budget.amount.toLocaleString()}</p>
+        </div>
+        <Progress value={spentPercentage} className="h-3 rounded-lg" indicatorClassName={getProgressColor(spentPercentage)} />
+        <p className="text-xs text-muted-foreground text-right">{spentPercentage.toFixed(0)}% spent</p>
+      </CardContent>
+      <CardFooter className="flex justify-end gap-2">
+        <Button variant="ghost" size="icon" onClick={() => onEdit(budget)} aria-label="Edit budget">
+          <Edit3 className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => onDelete(budget.id)} aria-label="Delete budget">
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+});
+BudgetCard.displayName = 'BudgetCard';
+
+
 export default function BudgetsPage() {
   const { toast } = useToast();
   const [budgets, setBudgets] = useState<Budget[]>([
@@ -74,11 +116,6 @@ export default function BudgetsPage() {
     toast({ title: "Budget Deleted", description: `Budget has been removed.`, variant: "destructive"});
   };
   
-  const getProgressColor = (percentage: number) => {
-    if (percentage > 90) return 'bg-red-500';
-    if (percentage > 70) return 'bg-yellow-500';
-    return 'bg-green-500';
-  };
 
   return (
     <div className="space-y-6">
@@ -161,38 +198,9 @@ export default function BudgetsPage() {
       )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {budgets.map((budget) => {
-          const spentPercentage = budget.amount > 0 ? Math.min((budget.spent / budget.amount) * 100, 100) : 0;
-          return (
-            <Card key={budget.id} className="rounded-2xl shadow-lg flex flex-col">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">{budget.name}</CardTitle>
-                    <CardDescription className="capitalize">{budget.category} - {budgetPeriods.find(p=>p.value === budget.period)?.label} {budget.period === 'custom' ? `(${budget.customPeriodDetails})` : ''}</CardDescription>
-                  </div>
-                  <PiggyBank className="h-8 w-8 text-primary" />
-                </div>
-              </CardHeader>
-              <CardContent className="flex-grow space-y-2">
-                <div className="flex justify-between items-baseline">
-                  <p className="text-2xl font-semibold">${budget.spent.toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground">of ${budget.amount.toLocaleString()}</p>
-                </div>
-                <Progress value={spentPercentage} className="h-3 rounded-lg" indicatorClassName={getProgressColor(spentPercentage)} />
-                <p className="text-xs text-muted-foreground text-right">{spentPercentage.toFixed(0)}% spent</p>
-              </CardContent>
-              <CardFooter className="flex justify-end gap-2">
-                <Button variant="ghost" size="icon" onClick={() => openForm(budget)} aria-label="Edit budget">
-                  <Edit3 className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={() => handleDeleteBudget(budget.id)} aria-label="Delete budget">
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </CardFooter>
-            </Card>
-          );
-        })}
+        {budgets.map((budget) => (
+           <BudgetCard key={budget.id} budget={budget} onEdit={openForm} onDelete={handleDeleteBudget} />
+        ))}
       </div>
     </div>
   );
