@@ -12,7 +12,7 @@ import Image from 'next/image';
 import { useAssets } from "@/contexts/AssetContext"; 
 import { useGoals, type Goal } from "@/contexts/GoalContext"; 
 import { useTransactions } from "@/contexts/TransactionContext";
-import { motion } from 'framer-motion'; // Added missing import
+import { motion } from 'framer-motion';
 import { ChartContainer } from "@/components/ui/chart"; 
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -217,7 +217,7 @@ export default function HomePage() {
           </CardHeader>
           <CardContent>
             {Object.entries(portfolioTotalsByCurrency).map(([currency, total]) => (
-              <div key={currency} className="text-2xl sm:text-3xl font-bold text-primary mb-1">
+              <div key={currency} className="text-xl sm:text-2xl md:text-3xl font-bold text-primary mb-1">
                 {formatCurrency(total, currency)}
                 <span className="text-sm text-muted-foreground ml-1">({currency})</span>
               </div>
@@ -253,7 +253,7 @@ export default function HomePage() {
                 <span>Note: This chart sums numerical values of assets in different currencies without conversion.</span>
               </div>
             )}
-            <ChartContainer config={{}} className="aspect-video h-[250px] w-full sm:h-[300px]">
+            <ChartContainer config={{}} className="aspect-video h-[200px] sm:h-[250px] md:h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                   <RechartsTooltip
@@ -285,7 +285,7 @@ export default function HomePage() {
                     layout="horizontal" 
                     verticalAlign="bottom" 
                     align="center"
-                    wrapperStyle={{paddingTop: "10px"}}
+                    wrapperStyle={{paddingTop: "10px", fontSize: "0.75rem"}} // Adjusted legend style
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -296,11 +296,11 @@ export default function HomePage() {
       )}
 
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {Object.entries(categorySummariesByCurrency).map(([currency, summaries]) => (
           <React.Fragment key={`${currency}-fragment`}>
             {Object.keys(portfolioTotalsByCurrency).length > 1 && (
-              <h2 key={`${currency}-header`} className="text-xl sm:text-2xl font-semibold tracking-tight mt-6 border-b pb-2 md:col-span-2 lg:col-span-3">Asset Summaries ({currency})</h2>
+              <h2 key={`${currency}-header`} className="text-lg sm:text-xl font-semibold tracking-tight mt-6 border-b pb-2 col-span-1 sm:col-span-2 lg:col-span-3">Asset Summaries ({currency})</h2>
             )}
             {orderedCategories.map((category) => {
               const summary = summaries[category];
@@ -327,7 +327,7 @@ export default function HomePage() {
                       {categoryIcons[category]}
                     </CardHeader>
                     <CardContent className="flex-grow">
-                      <div className="text-2xl font-bold">{formatCurrency(summary.totalValue, currency)}</div>
+                      <div className="text-xl sm:text-2xl font-bold">{formatCurrency(summary.totalValue, currency)}</div>
                       {(category === 'stock' || category === 'crypto' || category === 'mutualfund') && summary.gainLossAmount !== undefined && summary.totalPurchaseCost !== undefined && (
                         <p className={`text-xs mt-1 ${summary.gainLossAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                           {summary.gainLossAmount >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1"/> : <AlertTriangle className="inline h-4 w-4 mr-1"/>}
@@ -355,7 +355,7 @@ export default function HomePage() {
         ))}
       </div>
       
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         <motion.div
           className="h-full"
           whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
@@ -378,7 +378,7 @@ export default function HomePage() {
                 </div>
               </div>
               {monthlyExpensePieChartData.length > 0 ? (
-                <ChartContainer config={{}} className="aspect-square h-[200px] sm:h-[250px] w-full">
+                <ChartContainer config={{}} className="aspect-square h-[180px] sm:h-[200px] md:h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <RechartsTooltip
@@ -514,14 +514,14 @@ export default function HomePage() {
         </motion.div>
         
         <motion.div
-          className="h-full"
+          className="h-full md:col-span-2 lg:col-span-1" // Allow AI card to span on md if it's the last in a row of 2
           whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
           whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
         >
           <Card className="rounded-2xl shadow-lg h-full flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-base sm:text-lg font-medium">AI Savings Tip</CardTitle>
-              <Image src="https://placehold.co/24x24.png" alt="AI Icon" width={24} height={24} data-ai-hint="robot lightbulb"/>
+              <Image src="https://placehold.co/24x24.png" alt="AI Icon" width={24} height={24}/>
             </CardHeader>
             <CardContent className="flex-grow">
               <p className="text-sm">Review your streaming subscriptions. You could save $25/month!</p>
@@ -546,7 +546,4 @@ const categoryDisplayNames: Record<AssetCategory | string, string> = {
   property: "Properties",
   mutualfund: "Mutual Funds",
 };
-
-    
-
     
