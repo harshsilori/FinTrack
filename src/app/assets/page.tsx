@@ -1,29 +1,32 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogTrigger, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, ExternalLink, AlertTriangle, Search, Loader2 } from 'lucide-react';
+import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, ExternalLink, AlertTriangle, Search } from 'lucide-react';
 import Image from 'next/image';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Line, LineChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+// Chart related imports commented out as they are not currently used after manual price entry switch
+// import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+// import { BarChart, Line, LineChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { useToast } from "@/hooks/use-toast";
 import { useAssets, type Asset as ContextAsset, type AssetCategory } from '@/contexts/AssetContext';
+import { AnimatePresence, motion } from 'framer-motion';
 
 
-const assetIcons: Record<AssetCategory, React.ReactNode> = {
-  bank: <Landmark className="h-8 w-8 text-blue-500" />,
-  stock: <BarChartBig className="h-8 w-8 text-green-500" />,
-  crypto: <Bitcoin className="h-8 w-8 text-orange-500" />,
-  property: <Building2 className="h-8 w-8 text-purple-500" />,
-  mutualfund: <WalletCards className="h-8 w-8 text-indigo-500" />,
+const assetIcons: Record<AssetCategory | 'overview', React.ReactNode> = {
+  overview: <WalletCards className="h-5 w-5 text-muted-foreground" />,
+  bank: <Landmark className="h-5 w-5 text-muted-foreground" />,
+  stock: <BarChartBig className="h-5 w-5 text-muted-foreground" />,
+  crypto: <Bitcoin className="h-5 w-5 text-muted-foreground" />,
+  property: <Building2 className="h-5 w-5 text-muted-foreground" />,
+  mutualfund: <WalletCards className="h-5 w-5 text-muted-foreground" />,
 };
 
 const initialAssetFormState: Partial<ContextAsset> = {
@@ -55,9 +58,10 @@ const categoryDisplayNames: Record<AssetCategory | 'overview', string> = {
   mutualfund: "Mutual Funds",
 };
 
-const assetCategories: AssetCategory[] = ['bank', 'stock', 'crypto', 'property', 'mutualfund'];
+const orderedAssetCategories: AssetCategory[] = ['bank', 'stock', 'crypto', 'property', 'mutualfund'];
 
-const AssetCardComponent = ({ asset, onEdit, onDelete }: { asset: ContextAsset, onEdit: (asset: ContextAsset) => void, onDelete: (id: string) => void }) => {
+
+const AssetCardComponent = React.memo(({ asset, onEdit, onDelete }: { asset: ContextAsset, onEdit: (asset: ContextAsset) => void, onDelete: (id: string) => void }) => {
   const marketValue = (asset.category === 'bank' || asset.category === 'property')
     ? asset.currentPrice
     : asset.currentPrice * (asset.quantity || 0);
@@ -73,6 +77,7 @@ const AssetCardComponent = ({ asset, onEdit, onDelete }: { asset: ContextAsset, 
       setClientFormattedLastUpdated(null);
     }
   }, [asset.lastUpdated]);
+
 
   let allTimeGainLoss = 0;
   let allTimeGainLossPercent = 0;
@@ -100,7 +105,7 @@ const AssetCardComponent = ({ asset, onEdit, onDelete }: { asset: ContextAsset, 
             {categoryDisplayNames[asset.category]} {asset.tickerSymbol && `(${asset.tickerSymbol})`} - {asset.currency}
           </CardDescription>
         </div>
-        {assetIcons[asset.category]}
+        {assetIcons[asset.category] ? React.cloneElement(assetIcons[asset.category] as React.ReactElement, { className: "h-8 w-8" }) : <WalletCards className="h-8 w-8" />}
       </CardHeader>
       <CardContent className="flex-grow space-y-3">
         <div className="space-y-1">
@@ -128,11 +133,11 @@ const AssetCardComponent = ({ asset, onEdit, onDelete }: { asset: ContextAsset, 
           </>
         )}
          <p className="text-xs text-muted-foreground pt-2">
-          {clientFormattedLastUpdated !== null
-            ? `Details last saved: ${clientFormattedLastUpdated}`
-            : (asset.lastUpdated ? "Loading save date..." : "")
-          }
-        </p>
+            {clientFormattedLastUpdated !== null
+              ? `Details last saved: ${clientFormattedLastUpdated}`
+              : (asset.lastUpdated ? "Loading save date..." : "")
+            }
+         </p>
       </CardContent>
       <CardFooter className="flex justify-end items-center gap-1">
             <Button variant="ghost" size="icon" onClick={() => onEdit(asset)} aria-label="Edit asset">
@@ -144,25 +149,27 @@ const AssetCardComponent = ({ asset, onEdit, onDelete }: { asset: ContextAsset, 
       </CardFooter>
     </Card>
   );
-};
+});
+AssetCardComponent.displayName = 'AssetCardComponent';
 
 
 export default function AssetsPage() {
   const { toast } = useToast();
   const { assets: allAssets, addAsset, updateAsset, deleteAsset: deleteAssetFromContext } = useAssets();
+  
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentAssetForForm, setCurrentAssetForForm] = useState<Partial<ContextAsset>>(initialAssetFormState);
-  
+    
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const activeTab = useMemo(() => {
     const tabParam = searchParams.get('category') as AssetCategory | 'overview' | null;
-    if (tabParam && (assetCategories.includes(tabParam as AssetCategory) || tabParam === 'overview')) {
+    if (tabParam && (orderedAssetCategories.includes(tabParam as AssetCategory) || tabParam === 'overview')) {
         return tabParam;
     }
-    return 'overview'; // Default to overview if no valid category or no category param
+    return 'overview'; 
   }, [searchParams]);
 
 
@@ -180,7 +187,7 @@ export default function AssetsPage() {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return []; // Empty for overview tab as it has its own summary section
+    return allAssets; 
   }, [allAssets, activeTab]);
 
   const openForm = (asset?: ContextAsset) => {
@@ -195,7 +202,7 @@ export default function AssetsPage() {
         currentPrice: 0,
       };
        if (prefilledCategory === 'bank' || prefilledCategory === 'property') {
-        newInitialState.quantity = 1; // Default quantity for non-trackable
+        newInitialState.quantity = 1; 
         delete newInitialState.purchasePrice; 
         delete newInitialState.tickerSymbol; 
       } else {
@@ -247,7 +254,7 @@ export default function AssetsPage() {
       updateAsset({ id: currentAssetForForm.id, ...assetPayload });
       toast({ title: "Asset Updated", description: `${assetPayload.name} has been updated.` });
     } else { 
-      addAsset(assetPayload as Omit<ContextAsset, 'id' | 'lastUpdated'>);
+      const addedAsset = addAsset(assetPayload as Omit<ContextAsset, 'id' | 'lastUpdated'>);
       toast({ title: "Asset Added", description: `${assetPayload.name} has been added.` });
     }
     setIsFormOpen(false);
@@ -313,9 +320,9 @@ export default function AssetsPage() {
   };
 
   const assetLabelMap: Record<AssetCategory, { name: string, quantity: string, purchasePrice: string, tickerSymbol: string, currentPrice: string }> = {
-    stock: { name: "Company Name", quantity: "Number of Shares", purchasePrice: "Purchase Price per Share", tickerSymbol: "Stock Ticker (Optional)", currentPrice: "Current Price per Share (Manual Entry)" },
-    crypto: { name: "Cryptocurrency Name", quantity: "Quantity Owned", purchasePrice: "Purchase Price per Unit", tickerSymbol: "Crypto Symbol (Optional)", currentPrice: "Current Price per Unit (Manual Entry)" },
-    mutualfund: { name: "Fund Name", quantity: "Units Held", purchasePrice: "Purchase Price per Unit", tickerSymbol: "Fund Symbol (Optional)", currentPrice: "Current Price per Unit (NAV - Manual Entry)" },
+    stock: { name: "Company Name", quantity: "Number of Shares", purchasePrice: "Purchase Price per Share", tickerSymbol: "Stock Ticker (e.g. AAPL, MSFT)", currentPrice: "Current Price per Share" },
+    crypto: { name: "Cryptocurrency Name", quantity: "Quantity Owned", purchasePrice: "Purchase Price per Unit", tickerSymbol: "Crypto Symbol (e.g. BTC, ETH)", currentPrice: "Current Price per Unit" },
+    mutualfund: { name: "Fund Name", quantity: "Units Held", purchasePrice: "Purchase Price per Unit", tickerSymbol: "Fund Symbol/Scheme Code (Optional)", currentPrice: "Current Price per Unit (NAV)" },
     bank: { name: "Account Nickname", quantity: "N/A", purchasePrice: "N/A", tickerSymbol: "N/A", currentPrice: "Current Balance"},
     property: { name: "Property Name", quantity: "N/A", purchasePrice: "N/A", tickerSymbol: "N/A", currentPrice: "Current Estimated Value" },
   };
@@ -323,13 +330,135 @@ export default function AssetsPage() {
   const currentAssetLabels = assetLabelMap[currentAssetForForm?.category || 'stock'];
   const isTrackableCategoryInForm = currentAssetForForm?.category === 'stock' || currentAssetForForm?.category === 'crypto' || currentAssetForForm?.category === 'mutualfund';
 
+  const renderContentForTab = (tab: AssetCategory | 'overview') => {
+    if (tab === 'overview') {
+      return (
+        <Card className="rounded-2xl shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle>Portfolio Snapshot</CardTitle>
+              <Coins className="h-5 w-5 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+              {Object.keys(portfolioTotalsByCurrency).length === 0 && <p className="text-muted-foreground">No assets to display totals for. Add some assets to get started.</p>}
+              {Object.entries(portfolioTotalsByCurrency).map(([currency, totalData]) => {
+                  const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
+                      ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100
+                      : (totalData.allTimeGain !== 0 ? Infinity : 0); 
+                  return (
+                      <div key={currency} className="mb-3">
+                      <p className="text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
+                          <span className="text-sm text-muted-foreground ml-1">({currency} Total Portfolio)</span>
+                      </p>
+                      {(totalData.allTimeGain !== 0) && (
+                          <div className="text-sm flex items-center mt-1">
+                          <span className="text-muted-foreground mr-1">All-Time Gain/Loss:</span>
+                          <span className={totalData.allTimeGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                              {totalData.allTimeGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <AlertTriangle className="inline h-4 w-4 mr-1" />}
+                              {totalData.allTimeGain >= 0 ? '+' : ''}{formatCurrency(totalData.allTimeGain, currency)}
+                              {(!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent))
+                              ? ` (${allTimeGainLossPercent.toFixed(2)}%)`
+                              : (totalData.totalPurchaseCost === 0 && totalData.allTimeGain !== 0 ? ` (N/A %)` : ` (0.00%)`)}
+                          </span>
+                          </div>
+                      )}
+                      </div>
+                  );
+              })}
+          </CardContent>
+          {allAssets.length === 0 && (
+              <CardContent className="pt-0">
+                  <div className="text-center text-muted-foreground py-4">
+                      <WalletCards className="mx-auto h-12 w-12 mb-4 text-primary" />
+                      <p className="text-lg font-semibold">No assets yet!</p>
+                      <p>Click "Add Asset" above to start building your portfolio.</p>
+                  </div>
+              </CardContent>
+          )}
+        </Card>
+      );
+    } else { // Category specific tab
+      const category = tab as AssetCategory;
+      const assetsForThisCategory = displayedAssets.filter(asset => asset.category === category);
+      return (
+        <>
+          <Card className="rounded-2xl shadow-lg mb-6">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle>{categoryDisplayNames[category]} Summary</CardTitle>
+            {assetIcons[category] ? React.cloneElement(assetIcons[category] as React.ReactElement) : <Coins className="h-5 w-5 text-muted-foreground" />}
+            </CardHeader>
+            <CardContent>
+            {Object.keys(categorySpecificTotals).length === 0 && assetsForThisCategory.length === 0 && <p className="text-muted-foreground">No assets in this category. Add one using the "Add Asset" button.</p>}
+            {Object.entries(categorySpecificTotals).map(([currency, totalData]) => {
+                const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
+                    ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100
+                    : (totalData.allTimeGain !== 0 ? Infinity : 0);
+                const isTrackableCategoryForTab = category === 'stock' || category === 'crypto' || category === 'mutualfund';
+                
+                const assetsInThisCurrencyAndCategory = allAssets.filter(a => a.category === category && a.currency === currency);
+                if (assetsInThisCurrencyAndCategory.length === 0 && totalData.marketValue === 0) { 
+                    return null;
+                }
+                
+                return (
+                    <div key={currency} className="mb-3">
+                    <p className="text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
+                        <span className="text-sm text-muted-foreground ml-1">({currency} Total {categoryDisplayNames[category].toLowerCase()})</span>
+                    </p>
+                    {isTrackableCategoryForTab && (totalData.allTimeGain !== 0) && (
+                        <div className="text-sm flex items-center mt-1">
+                        <span className="text-muted-foreground mr-1">All-Time Gain/Loss:</span>
+                        <span className={totalData.allTimeGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                            {totalData.allTimeGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <AlertTriangle className="inline h-4 w-4 mr-1" />}
+                            {totalData.allTimeGain >= 0 ? '+' : ''}{formatCurrency(totalData.allTimeGain, currency)}
+                            {(!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent))
+                            ? ` (${allTimeGainLossPercent.toFixed(2)}%)`
+                            : (totalData.totalPurchaseCost === 0 && totalData.allTimeGain !== 0 ? ` (N/A %)` : ` (0.00%)`)}
+                        </span>
+                        </div>
+                    )}
+                    </div>
+                );
+            })}
+            {assetsForThisCategory.length === 0 && (
+                <p className="text-muted-foreground">No assets in this category yet. Add one using the button above.</p>
+            )}
+            </CardContent>
+          </Card>
+
+          {assetsForThisCategory.length === 0 && (
+              <Card className="rounded-2xl shadow-lg">
+                  <CardContent className="pt-6 text-center text-muted-foreground">
+                      {assetIcons[category] ? React.cloneElement(assetIcons[category] as React.ReactElement, { className: "mx-auto h-12 w-12 mb-4 text-primary" }) : <WalletCards className="mx-auto h-12 w-12 mb-4 text-primary" />}
+                      <p className="text-lg font-semibold">No {categoryDisplayNames[category].toLowerCase()} added yet!</p>
+                      <p>Use the "Add Asset" button above to track your {categoryDisplayNames[category].toLowerCase()}.</p>
+                  </CardContent>
+              </Card>
+          )}
+
+          <div className="grid gap-6 md:grid-cols-1">
+              {assetsForThisCategory.map((asset) => (
+                  <AssetCardComponent key={asset.id} asset={asset} onEdit={openForm} onDelete={handleDeleteAsset} />
+              ))}
+          </div>
+          {assetsForThisCategory.length > 0 && (
+            <div className="mt-4 text-xs text-muted-foreground">
+              <Info className="inline h-3 w-3 mr-1" />
+              All prices are manually entered by the user. All-time gain/loss is calculated based on purchase price and current price.
+            </div>
+          )}
+        </>
+      );
+    }
+  };
+
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Asset Portfolio</h1>
           <p className="text-muted-foreground">
-            Manually track your investments and net worth. All prices are user-entered.
+            Manually track your investments and net worth.
           </p>
         </div>
         <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
@@ -351,23 +480,22 @@ export default function AssetsPage() {
             </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">{currentAssetLabels.name}</Label>
-                 <div className="col-span-3">
-                    <Input
-                        id="name"
-                        value={currentAssetForForm?.name || ''}
-                        onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, name: e.target.value }))}
-                        placeholder={
-                            currentAssetForForm?.category === 'stock' ? 'e.g., Apple Inc.' :
-                            currentAssetForForm?.category === 'crypto' ? 'e.g., Bitcoin' :
-                            currentAssetForForm?.category === 'mutualfund' ? 'e.g., Vanguard S&P 500 ETF' :
-                            currentAssetForForm?.category === 'bank' ? 'e.g., Main Savings Account' :
-                            'e.g., Downtown Condo'
-                        }
-                     />
-                </div>
-            </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="name" className="text-right">{currentAssetLabels.name}</Label>
+                  <Input
+                      id="name"
+                      value={currentAssetForForm?.name || ''}
+                      onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, name: e.target.value }))}
+                      className="col-span-3"
+                      placeholder={
+                          currentAssetForForm?.category === 'stock' ? 'e.g., Apple Inc.' :
+                          currentAssetForForm?.category === 'crypto' ? 'e.g., Bitcoin' :
+                          currentAssetForForm?.category === 'mutualfund' ? 'e.g., Vanguard S&P 500 ETF' :
+                          currentAssetForForm?.category === 'bank' ? 'e.g., Main Savings Account' :
+                          'e.g., Downtown Condo'
+                      }
+                  />
+              </div>
 
             {isTrackableCategoryInForm && (
                 <div className="grid grid-cols-4 items-center gap-4">
@@ -384,6 +512,9 @@ export default function AssetsPage() {
                             ''
                         }
                     />
+                    <p className="col-span-4 text-xs text-muted-foreground text-right pt-1">
+                       <Search className="inline h-3 w-3 mr-1" /> For stocks/crypto, use the common ticker (e.g. AAPL, GOOG, BTCUSD). For Mutual Funds, use the scheme code if known. Search online for '[Asset Name] ticker/symbol' if unsure.
+                    </p>
                 </div>
             )}
 
@@ -394,13 +525,13 @@ export default function AssetsPage() {
                     <SelectValue placeholder="Select asset category" />
                 </SelectTrigger>
                 <SelectContent>
-                    {assetCategories.map(cat => <SelectItem key={cat} value={cat}>{categoryDisplayNames[cat]}</SelectItem>)}
+                    {orderedAssetCategories.map(cat => <SelectItem key={cat} value={cat}>{categoryDisplayNames[cat]}</SelectItem>)}
                 </SelectContent>
                 </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="currency" className="text-right">Currency</Label>
-                <Select value={currentAssetForForm?.currency || 'USD'} onValueChange={(value) => setCurrentAssetForForm({...currentAssetForForm, currency: value })}>
+                <Select value={currentAssetForForm?.currency || 'USD'} onValueChange={(value) => setCurrentAssetForForm(prev => ({ ...prev, currency: value }))}>
                 <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
@@ -413,20 +544,20 @@ export default function AssetsPage() {
             {(currentAssetForForm?.category !== 'bank' && currentAssetForForm?.category !== 'property') && (
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="quantity" className="text-right">{currentAssetLabels.quantity}</Label>
-                    <Input id="quantity" type="number" value={currentAssetForForm?.quantity === undefined ? '' : currentAssetForForm.quantity} onChange={(e) => setCurrentAssetForForm({...currentAssetForForm, quantity: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder={currentAssetForForm?.category === 'stock' ? 'e.g. 10' : currentAssetForForm?.category === 'crypto' ? 'e.g. 0.5' : 'e.g. 100'}/>
+                    <Input id="quantity" type="number" value={currentAssetForForm?.quantity === undefined ? '' : currentAssetForForm.quantity} onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 0 }))} className="col-span-3" placeholder={currentAssetForForm?.category === 'stock' ? 'e.g. 10' : currentAssetForForm?.category === 'crypto' ? 'e.g. 0.5' : 'e.g. 100'}/>
                 </div>
             )}
 
             {isTrackableCategoryInForm && (
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="purchasePrice" className="text-right">{currentAssetLabels.purchasePrice}</Label>
-                    <Input id="purchasePrice" type="number" value={currentAssetForForm?.purchasePrice === undefined ? '' : currentAssetForForm.purchasePrice} onChange={(e) => setCurrentAssetForForm({...currentAssetForForm, purchasePrice: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder="Price per unit at purchase" />
+                    <Input id="purchasePrice" type="number" value={currentAssetForForm?.purchasePrice === undefined ? '' : currentAssetForForm.purchasePrice} onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, purchasePrice: parseFloat(e.target.value) || 0 }))} className="col-span-3" placeholder="Price per unit at purchase" />
                 </div>
             )}
 
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="currentPrice" className="text-right">{currentAssetLabels.currentPrice}</Label>
-                <Input id="currentPrice" type="number" value={currentAssetForForm?.currentPrice === undefined ? '' : currentAssetForForm.currentPrice} onChange={(e) => setCurrentAssetForForm({...currentAssetForForm, currentPrice: parseFloat(e.target.value) || 0 })} className="col-span-3" placeholder="Manually enter current price/value" />
+                <Input id="currentPrice" type="number" value={currentAssetForForm?.currentPrice === undefined ? '' : currentAssetForForm.currentPrice} onChange={(e) => setCurrentAssetForForm(prev => ({ ...prev, currentPrice: parseFloat(e.target.value) || 0 }))} className="col-span-3" placeholder="Manually enter current price/value" />
             </div>
 
             </div>
@@ -444,126 +575,47 @@ export default function AssetsPage() {
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-4">
             <TabsTrigger value="overview">{categoryDisplayNames['overview']}</TabsTrigger>
-            {assetCategories.map(cat => (
+            {orderedAssetCategories.map(cat => (
                 <TabsTrigger key={cat} value={cat}>{categoryDisplayNames[cat]}</TabsTrigger>
             ))}
         </TabsList>
+        
+        <div className="relative mt-2"> {/* Container for animated content */}
+          <AnimatePresence mode="wait">
+            {/* Conditionally render motion.div for each tab's content */}
+            {activeTab === 'overview' && (
+              <motion.div
+                key="overview-content"
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+              >
+                <TabsContent value="overview" forceMount className="w-full">
+                  {renderContentForTab('overview')}
+                </TabsContent>
+              </motion.div>
+            )}
 
-        <TabsContent value="overview">
-            <Card className="rounded-2xl shadow-lg">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle>Portfolio Snapshot</CardTitle>
-                    <Coins className="h-5 w-5 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    {Object.keys(portfolioTotalsByCurrency).length === 0 && <p className="text-muted-foreground">No assets to display totals for. Add some assets to get started.</p>}
-                    {Object.entries(portfolioTotalsByCurrency).map(([currency, totalData]) => {
-                        const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
-                            ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100
-                            : (totalData.allTimeGain !== 0 ? Infinity : 0); 
-                        return (
-                            <div key={currency} className="mb-3">
-                            <p className="text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
-                                <span className="text-sm text-muted-foreground ml-1">({currency} Total Portfolio)</span>
-                            </p>
-                            {(totalData.allTimeGain !== 0) && (
-                                <div className="text-sm flex items-center mt-1">
-                                <span className="text-muted-foreground mr-1">All-Time Gain/Loss:</span>
-                                <span className={totalData.allTimeGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                                    {totalData.allTimeGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <AlertTriangle className="inline h-4 w-4 mr-1" />}
-                                    {totalData.allTimeGain >= 0 ? '+' : ''}{formatCurrency(totalData.allTimeGain, currency)}
-                                    {(!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent))
-                                    ? ` (${allTimeGainLossPercent.toFixed(2)}%)`
-                                    : (totalData.totalPurchaseCost === 0 && totalData.allTimeGain !== 0 ? ` (N/A %)` : ` (0.00%)`)}
-                                </span>
-                                </div>
-                            )}
-                            </div>
-                        );
-                    })}
-                </CardContent>
-                 {allAssets.length === 0 && (
-                    <CardContent className="pt-0">
-                        <div className="text-center text-muted-foreground py-4">
-                            <WalletCards className="mx-auto h-12 w-12 mb-4 text-primary" />
-                            <p className="text-lg font-semibold">No assets yet!</p>
-                            <p>Click "Add Asset" above to start building your portfolio.</p>
-                        </div>
-                    </CardContent>
-                )}
-            </Card>
-        </TabsContent>
-
-        {assetCategories.map(category => (
-            <TabsContent key={category} value={category}>
-                <Card className="rounded-2xl shadow-lg mb-6">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle>{categoryDisplayNames[category]} Summary</CardTitle>
-                    {assetIcons[category] ? React.cloneElement(assetIcons[category] as React.ReactElement, { className: "h-5 w-5 text-muted-foreground" }) : <Coins className="h-5 w-5 text-muted-foreground" />}
-                    </CardHeader>
-                    <CardContent>
-                    {Object.keys(categorySpecificTotals).length === 0 && allAssets.filter(a => a.category === category).length === 0 && <p className="text-muted-foreground">No assets in this category. Add one using the "Add Asset" button.</p>}
-                    {Object.entries(categorySpecificTotals).map(([currency, totalData]) => {
-                        const allTimeGainLossPercent = totalData.totalPurchaseCost > 0
-                            ? (totalData.allTimeGain / totalData.totalPurchaseCost) * 100
-                            : (totalData.allTimeGain !== 0 ? Infinity : 0);
-                        const isTrackableCategoryForTab = category === 'stock' || category === 'crypto' || category === 'mutualfund';
-                        
-                        const assetsInThisCurrencyAndCategory = allAssets.filter(a => a.category === category && a.currency === currency);
-                        if (assetsInThisCurrencyAndCategory.length === 0 && totalData.marketValue === 0) { 
-                            return null;
-                        }
-                        
-                        return (
-                            <div key={currency} className="mb-3">
-                            <p className="text-2xl font-bold text-primary">{formatCurrency(totalData.marketValue, currency)}
-                                <span className="text-sm text-muted-foreground ml-1">({currency} Total {categoryDisplayNames[category].toLowerCase()})</span>
-                            </p>
-                            {isTrackableCategoryForTab && (totalData.allTimeGain !== 0) && (
-                                <div className="text-sm flex items-center mt-1">
-                                <span className="text-muted-foreground mr-1">All-Time Gain/Loss:</span>
-                                <span className={totalData.allTimeGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                                    {totalData.allTimeGain >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <AlertTriangle className="inline h-4 w-4 mr-1" />}
-                                    {totalData.allTimeGain >= 0 ? '+' : ''}{formatCurrency(totalData.allTimeGain, currency)}
-                                    {(!isNaN(allTimeGainLossPercent) && isFinite(allTimeGainLossPercent))
-                                    ? ` (${allTimeGainLossPercent.toFixed(2)}%)`
-                                    : (totalData.totalPurchaseCost === 0 && totalData.allTimeGain !== 0 ? ` (N/A %)` : ` (0.00%)`)}
-                                </span>
-                                </div>
-                            )}
-                            </div>
-                        );
-                    })}
-                     {allAssets.filter(a => a.category === category).length === 0 && (
-                        <p className="text-muted-foreground">No assets in this category yet. Add one using the button above.</p>
-                    )}
-                    </CardContent>
-                </Card>
-
-                {displayedAssets.length === 0 && activeTab === category && (
-                    <Card className="rounded-2xl shadow-lg">
-                        <CardContent className="pt-6 text-center text-muted-foreground">
-                             {assetIcons[category] ? React.cloneElement(assetIcons[category] as React.ReactElement, { className: "mx-auto h-12 w-12 mb-4 text-primary" }) : <WalletCards className="mx-auto h-12 w-12 mb-4 text-primary" />}
-                            <p className="text-lg font-semibold">No {categoryDisplayNames[category].toLowerCase()} added yet!</p>
-                            <p>Use the "Add Asset" button above to track your {categoryDisplayNames[category].toLowerCase()}.</p>
-                        </CardContent>
-                    </Card>
-                )}
-
-                <div className="grid gap-6 md:grid-cols-1">
-                    {displayedAssets.map((asset) => (
-                        <AssetCardComponent key={asset.id} asset={asset} onEdit={openForm} onDelete={handleDeleteAsset} />
-                    ))}
-                </div>
-                 {displayedAssets.length > 0 && (
-                  <div className="mt-4 text-xs text-muted-foreground">
-                    <Info className="inline h-3 w-3 mr-1" />
-                    All prices are manually entered by the user. All-time gain/loss is calculated based on purchase price and current price.
-                  </div>
-                )}
-            </TabsContent>
-        ))}
+            {orderedAssetCategories.map((category) =>
+              activeTab === category && (
+                <motion.div
+                  key={`${category}-content`}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                >
+                  <TabsContent value={category} forceMount className="w-full">
+                    {renderContentForTab(category)}
+                  </TabsContent>
+                </motion.div>
+              )
+            )}
+          </AnimatePresence>
+        </div>
       </Tabs>
     </div>
   );
 }
+
