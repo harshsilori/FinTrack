@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    turbo: false // Explicitly disable Turbopack
+    // Remove the turbo: false line as it's causing config validation errors
   }
 };
 
