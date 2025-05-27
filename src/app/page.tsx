@@ -6,14 +6,14 @@ import type { AssetCategory } from "@/contexts/AssetContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Bitcoin, Landmark, BarChartBig, WalletCards, TrendingUp, DollarSign, PiggyBank, Building2, AlertTriangle, Target, Plane, ShieldCheck, AreaChart, PieChart as PieChartIcon, Info, CreditCard } from "lucide-react"; 
+import { Bitcoin, Landmark, BarChartBig, WalletCards, TrendingUp, DollarSign, PiggyBank, Building2, AlertTriangle, Target, Plane, ShieldCheck, AreaChart, PieChart as PieChartIcon, Info, CreditCard, Home, Car, Gift } from "lucide-react"; 
 import Link from "next/link";
 import Image from 'next/image';
-import { useAssets, type Asset } from "@/contexts/AssetContext"; // Updated to use Asset type from context directly
+import { useAssets } from "@/contexts/AssetContext"; 
 import { useGoals, type Goal } from "@/contexts/GoalContext"; 
-import { useTransactions, type Transaction } from "@/contexts/TransactionContext";
-// Removed direct Asset type import as it's now from useAssets
-import { ChartContainer } from "@/components/ui/chart"; // ChartTooltip, ChartTooltipContent removed as not directly used
+import { useTransactions } from "@/contexts/TransactionContext";
+import { motion } from 'framer-motion'; // Added missing import
+import { ChartContainer } from "@/components/ui/chart"; 
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
 
@@ -86,7 +86,7 @@ export default function HomePage() {
   assets.forEach(asset => {
     const marketValue = (asset.category === 'bank' || asset.category === 'property')
       ? asset.currentPrice
-      : asset.currentPrice * asset.quantity;
+      : asset.currentPrice * (asset.quantity || 0);
     portfolioTotalsByCurrency[asset.currency] = (portfolioTotalsByCurrency[asset.currency] || 0) + marketValue;
   });
 
@@ -106,12 +106,12 @@ export default function HomePage() {
     const summary = categorySummariesByCurrency[asset.currency][asset.category];
     const marketValue = (asset.category === 'bank' || asset.category === 'property')
       ? asset.currentPrice
-      : asset.currentPrice * asset.quantity;
+      : asset.currentPrice * (asset.quantity || 0);
     
     summary.totalValue += marketValue;
     summary.assetCount += 1;
 
-    if ((asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund') && asset.purchasePrice !== undefined && asset.quantity !== undefined) {
+    if ((asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund') && asset.purchasePrice !== undefined && (asset.quantity !== undefined && asset.quantity !== null)) {
       const purchaseCost = asset.purchasePrice * asset.quantity;
       summary.totalPurchaseCost = (summary.totalPurchaseCost || 0) + purchaseCost;
       summary.gainLossAmount = (summary.gainLossAmount || 0) + (marketValue - purchaseCost);
@@ -169,7 +169,7 @@ export default function HomePage() {
   assets.forEach(asset => {
     const marketValue = (asset.category === 'bank' || asset.category === 'property')
       ? asset.currentPrice
-      : asset.currentPrice * asset.quantity;
+      : asset.currentPrice * (asset.quantity || 0);
     const categoryName = categoryDisplayNames[asset.category] || asset.category;
     aggregatedValuesByCat[categoryName] = (aggregatedValuesByCat[categoryName] || 0) + marketValue;
     currenciesPresentInAllocation.add(asset.currency);
@@ -296,12 +296,12 @@ export default function HomePage() {
       )}
 
 
-      {Object.entries(categorySummariesByCurrency).map(([currency, summaries]) => (
-        <div key={currency} className="space-y-6">
-          {Object.keys(portfolioTotalsByCurrency).length > 1 && (
-            <h2 className="text-xl sm:text-2xl font-semibold tracking-tight mt-6 border-b pb-2">Asset Summaries ({currency})</h2>
-          )}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {Object.entries(categorySummariesByCurrency).map(([currency, summaries]) => (
+          <React.Fragment key={`${currency}-fragment`}>
+            {Object.keys(portfolioTotalsByCurrency).length > 1 && (
+              <h2 key={`${currency}-header`} className="text-xl sm:text-2xl font-semibold tracking-tight mt-6 border-b pb-2 md:col-span-2 lg:col-span-3">Asset Summaries ({currency})</h2>
+            )}
             {orderedCategories.map((category) => {
               const summary = summaries[category];
               if (!summary || summary.assetCount === 0) return null;
@@ -315,184 +315,225 @@ export default function HomePage() {
               };
 
               return (
-                <Card key={`${category}-${currency}`} className="rounded-2xl shadow-lg h-full flex flex-col">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-base font-medium">{titleMap[category]}</CardTitle>
-                    {categoryIcons[category]}
-                  </CardHeader>
-                  <CardContent className="flex-grow">
-                    <div className="text-2xl font-bold">{formatCurrency(summary.totalValue, currency)}</div>
-                    {(category === 'stock' || category === 'crypto' || category === 'mutualfund') && summary.gainLossAmount !== undefined && summary.totalPurchaseCost !== undefined && (
-                      <p className={`text-xs mt-1 ${summary.gainLossAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {summary.gainLossAmount >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1"/> : <AlertTriangle className="inline h-4 w-4 mr-1"/>}
-                        {formatCurrency(summary.gainLossAmount, currency)}
-                        {(summary.gainLossPercent !== undefined && summary.gainLossPercent !== Infinity && summary.gainLossPercent !== -Infinity && summary.totalPurchaseCost > 0) 
-                          ? ` (${summary.gainLossPercent.toFixed(2)}%)`
-                          : (summary.totalPurchaseCost === 0 && summary.gainLossAmount !== 0 ? ` (N/A %)` : ` (0.00%)`)}
-                        <span className="text-muted-foreground text-xs"> all-time</span>
-                      </p>
-                    )}
-                     <p className="text-xs text-muted-foreground mt-1">{summary.assetCount} asset(s)</p>
-                  </CardContent>
-                  <CardFooter>
-                    <Link href={`/assets?category=${category}`} className="w-full">
-                      <Button variant="outline" className="w-full text-xs sm:text-sm">
-                        View All {categoryDisplayNames[category] || category.charAt(0).toUpperCase() + category.slice(1)}
-                      </Button>
-                    </Link>
-                  </CardFooter>
-                </Card>
+                <motion.div
+                  key={`${category}-${currency}`}
+                  className="h-full"
+                  whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+                  whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+                >
+                  <Card className="rounded-2xl shadow-lg h-full flex flex-col">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-base font-medium">{titleMap[category]}</CardTitle>
+                      {categoryIcons[category]}
+                    </CardHeader>
+                    <CardContent className="flex-grow">
+                      <div className="text-2xl font-bold">{formatCurrency(summary.totalValue, currency)}</div>
+                      {(category === 'stock' || category === 'crypto' || category === 'mutualfund') && summary.gainLossAmount !== undefined && summary.totalPurchaseCost !== undefined && (
+                        <p className={`text-xs mt-1 ${summary.gainLossAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {summary.gainLossAmount >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1"/> : <AlertTriangle className="inline h-4 w-4 mr-1"/>}
+                          {formatCurrency(summary.gainLossAmount, currency)}
+                          {(summary.gainLossPercent !== undefined && summary.gainLossPercent !== Infinity && summary.gainLossPercent !== -Infinity && summary.totalPurchaseCost > 0) 
+                            ? ` (${summary.gainLossPercent.toFixed(2)}%)`
+                            : (summary.totalPurchaseCost === 0 && summary.gainLossAmount !== 0 ? ` (N/A %)` : ` (0.00%)`)}
+                          <span className="text-muted-foreground text-xs"> all-time</span>
+                        </p>
+                      )}
+                        <p className="text-xs text-muted-foreground mt-1">{summary.assetCount} asset(s)</p>
+                    </CardContent>
+                    <CardFooter>
+                      <Link href={`/assets?category=${category}`} className="w-full">
+                        <Button variant="outline" className="w-full text-xs sm:text-sm">
+                          View All {categoryDisplayNames[category] || category.charAt(0).toUpperCase() + category.slice(1)}
+                        </Button>
+                      </Link>
+                    </CardFooter>
+                  </Card>
+                </motion.div>
               );
             })}
-          </div>
-        </div>
-      ))}
+          </React.Fragment>
+        ))}
+      </div>
       
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="rounded-2xl shadow-lg h-full flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base sm:text-lg font-medium">This Month's Overview</CardTitle>
-            <PieChartIcon className="h-5 w-5 text-primary" />
-          </CardHeader>
-          <CardContent className="flex-grow">
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <p className="text-xs text-muted-foreground">Total Income</p>
-                <p className="text-lg font-semibold text-green-600">{formatCurrency(totalMonthlyIncome)}</p>
+        <motion.div
+          className="h-full"
+          whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+          whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+        >
+          <Card className="rounded-2xl shadow-lg h-full flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-base sm:text-lg font-medium">This Month's Overview</CardTitle>
+              <PieChartIcon className="h-5 w-5 text-primary" />
+            </CardHeader>
+            <CardContent className="flex-grow">
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Income</p>
+                  <p className="text-lg font-semibold text-green-600">{formatCurrency(totalMonthlyIncome)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Expenses</p>
+                  <p className="text-lg font-semibold text-red-600">{formatCurrency(totalMonthlyExpenses)}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Expenses</p>
-                <p className="text-lg font-semibold text-red-600">{formatCurrency(totalMonthlyExpenses)}</p>
-              </div>
-            </div>
-            {monthlyExpensePieChartData.length > 0 ? (
-              <ChartContainer config={{}} className="aspect-square h-[200px] sm:h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <RechartsTooltip
-                      contentStyle={{ borderRadius: "0.5rem", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)"}}
-                      formatter={(value: number, name: string, props) => [`${formatCurrency(value)} (${((value / totalMonthlyExpenses) * 100).toFixed(1)}%)`, name]}
-                    />
-                    <Pie data={monthlyExpensePieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} labelLine={false}
-                         label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
-                            const RADIAN = Math.PI / 180;
-                            const radius = innerRadius + (outerRadius - innerRadius) * 1.3; 
-                            const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                            const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                            const showLabel = (percent*100) > 3; 
-                            if(!showLabel) return null;
-                            return (
-                                <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-[10px]">
-                                    {name} ({(percent * 100).toFixed(0)}%)
-                                </text>
-                            );
-                        }}
-                    >
-                      {monthlyExpensePieChartData.map((entry, index) => (
-                        <Cell key={`cell-expense-${index}`} fill={entry.fill!} stroke="hsl(var(--background))" strokeWidth={2}/>
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No expenses recorded this month to display chart.</p>
-            )}
-             <p className="text-xs text-muted-foreground pt-2">Showing data for the current month.</p>
-          </CardContent>
-           <CardFooter>
-            <Link href="/transactions" className="w-full">
-              <Button variant="outline" className="w-full">View All Transactions</Button>
-            </Link>
-          </CardFooter>
-        </Card>
+              {monthlyExpensePieChartData.length > 0 ? (
+                <ChartContainer config={{}} className="aspect-square h-[200px] sm:h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <RechartsTooltip
+                        contentStyle={{ borderRadius: "0.5rem", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)"}}
+                        formatter={(value: number, name: string, props) => [`${formatCurrency(value)} (${((value / totalMonthlyExpenses) * 100).toFixed(1)}%)`, name]}
+                      />
+                      <Pie data={monthlyExpensePieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} labelLine={false}
+                          label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
+                              const RADIAN = Math.PI / 180;
+                              const radius = innerRadius + (outerRadius - innerRadius) * 1.3; 
+                              const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                              const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                              const showLabel = (percent*100) > 3; 
+                              if(!showLabel) return null;
+                              return (
+                                  <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-[10px]">
+                                      {name} ({(percent * 100).toFixed(0)}%)
+                                  </text>
+                              );
+                          }}
+                      >
+                        {monthlyExpensePieChartData.map((entry, index) => (
+                          <Cell key={`cell-expense-${index}`} fill={entry.fill!} stroke="hsl(var(--background))" strokeWidth={2}/>
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">No expenses recorded this month to display chart.</p>
+              )}
+              <p className="text-xs text-muted-foreground pt-2">Showing data for the current month.</p>
+            </CardContent>
+            <CardFooter>
+              <Link href="/transactions" className="w-full">
+                <Button variant="outline" className="w-full">View All Transactions</Button>
+              </Link>
+            </CardFooter>
+          </Card>
+        </motion.div>
 
 
         {goals.length > 0 && (
-              <Card className="rounded-2xl shadow-lg h-full flex flex-col">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-base sm:text-lg font-medium">Top Goal Progress</CardTitle>
-                  {goalDisplayIcons[goals[0].icon || 'Default'] || goalDisplayIcons.Default}
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p className="text-md font-semibold">{goals[0].name}</p>
-                  <Progress value={(goals[0].targetAmount > 0 ? (goals[0].currentAmount / goals[0].targetAmount) * 100 : 0)} className="my-2 h-2" />
-                  <p className="text-xs text-muted-foreground">
-                    {formatCurrency(goals[0].currentAmount, 'USD')} / {formatCurrency(goals[0].targetAmount, 'USD')}
-                  </p>
-                </CardContent>
-                <CardFooter>
-                  <Link href="/goals" className="w-full">
-                    <Button variant="outline" className="w-full">View All Goals</Button>
-                  </Link>
-                </CardFooter>
-              </Card>
+              <motion.div
+                className="h-full"
+                whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+                whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+              >
+                <Card className="rounded-2xl shadow-lg h-full flex flex-col">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-base sm:text-lg font-medium">Top Goal Progress</CardTitle>
+                    {goalDisplayIcons[goals[0].icon || 'Default'] || goalDisplayIcons.Default}
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    <p className="text-md font-semibold">{goals[0].name}</p>
+                    <Progress value={(goals[0].targetAmount > 0 ? (goals[0].currentAmount / goals[0].targetAmount) * 100 : 0)} className="my-2 h-2" />
+                    <p className="text-xs text-muted-foreground">
+                      {formatCurrency(goals[0].currentAmount, 'USD')} / {formatCurrency(goals[0].targetAmount, 'USD')}
+                    </p>
+                  </CardContent>
+                  <CardFooter>
+                    <Link href="/goals" className="w-full">
+                      <Button variant="outline" className="w-full">View All Goals</Button>
+                    </Link>
+                  </CardFooter>
+                </Card>
+              </motion.div>
         )}
 
         {goals.length === 0 && (
-           <Card className="rounded-2xl shadow-lg h-full flex flex-col">
-             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-               <CardTitle className="text-base sm:text-lg font-medium">Financial Goals</CardTitle>
-               <Target className="h-5 w-5 text-primary" />
-             </CardHeader>
-             <CardContent className="flex-grow">
-               <p className="text-sm">No goals set yet. Start planning your future!</p>
-             </CardContent>
-             <CardFooter>
-               <Link href="/goals" className="w-full">
-                 <Button variant="outline" className="w-full">Set a New Goal</Button>
-               </Link>
-             </CardFooter>
-           </Card>
+          <motion.div
+            className="h-full"
+            whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+            whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+          >
+            <Card className="rounded-2xl shadow-lg h-full flex flex-col">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-base sm:text-lg font-medium">Financial Goals</CardTitle>
+                <Target className="h-5 w-5 text-primary" />
+              </CardHeader>
+              <CardContent className="flex-grow">
+                <p className="text-sm">No goals set yet. Start planning your future!</p>
+              </CardContent>
+              <CardFooter>
+                <Link href="/goals" className="w-full">
+                  <Button variant="outline" className="w-full">Set a New Goal</Button>
+                </Link>
+              </CardFooter>
+            </Card>
+          </motion.div>
         )}
-
-        <Card className="rounded-2xl shadow-lg h-full flex flex-col">
+        <motion.div
+          className="h-full"
+          whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+          whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+        >
+          <Card className="rounded-2xl shadow-lg h-full flex flex-col">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-base sm:text-lg font-medium">Budget Health</CardTitle>
+                  <PiggyBank className="h-5 w-5 text-primary" />
+              </CardHeader>
+              <CardContent className="flex-grow">
+                  <p className="text-sm">Your budget overview will appear here once set up.</p>
+                  <p className="text-xs text-muted-foreground pt-1">Detailed budget management is available on the Budgets page.</p>
+              </CardContent>
+              <CardFooter>
+                  <Link href="/budgets" className="w-full">
+                      <Button variant="outline" className="w-full">Manage Budgets</Button>
+                  </Link>
+              </CardFooter>
+          </Card>
+        </motion.div>
+        <motion.div
+          className="h-full"
+          whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+          whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+        >
+          <Card className="rounded-2xl shadow-lg h-full flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-base sm:text-lg font-medium">Budget Health</CardTitle>
-                <PiggyBank className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base sm:text-lg font-medium">Debt Overview</CardTitle>
+              <CreditCard className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent className="flex-grow">
-                <p className="text-sm">Your budget overview will appear here once set up.</p>
-                <p className="text-xs text-muted-foreground pt-1">Detailed budget management is available on the Budgets page.</p>
+              <p className="text-sm">Track your liabilities and progress towards becoming debt-free.</p>
+              <p className="text-xs text-muted-foreground pt-1">Detailed debt management is available on the Debts page.</p>
             </CardContent>
             <CardFooter>
-                <Link href="/budgets" className="w-full">
-                    <Button variant="outline" className="w-full">Manage Budgets</Button>
-                </Link>
+              <Link href="/debts" className="w-full">
+                <Button variant="outline" className="w-full">Manage Debts</Button>
+              </Link>
             </CardFooter>
-        </Card>
-
-        <Card className="rounded-2xl shadow-lg h-full flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base sm:text-lg font-medium">Debt Overview</CardTitle>
-            <CreditCard className="h-5 w-5 text-primary" />
-          </CardHeader>
-          <CardContent className="flex-grow">
-            <p className="text-sm">Track your liabilities and progress towards becoming debt-free.</p>
-             <p className="text-xs text-muted-foreground pt-1">Detailed debt management is available on the Debts page.</p>
-          </CardContent>
-           <CardFooter>
-            <Link href="/debts" className="w-full">
-              <Button variant="outline" className="w-full">Manage Debts</Button>
-            </Link>
-          </CardFooter>
-        </Card>
+          </Card>
+        </motion.div>
         
-        <Card className="rounded-2xl shadow-lg h-full flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base sm:text-lg font-medium">AI Savings Tip</CardTitle>
-            <Image src="https://placehold.co/24x24.png" alt="AI Icon" width={24} height={24} data-ai-hint="robot lightbulb"/>
-          </CardHeader>
-          <CardContent className="flex-grow">
-            <p className="text-sm">Review your streaming subscriptions. You could save $25/month!</p>
-            <p className="text-xs text-muted-foreground pt-1">Actual AI insights based on your data are available on the Insights page.</p>
-          </CardContent>
-           <CardFooter>
-            <Link href="/insights" className="w-full">
-              <Button variant="outline" className="w-full">Get Personalized Insights</Button>
-            </Link>
-          </CardFooter>
-        </Card>
+        <motion.div
+          className="h-full"
+          whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
+          whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
+        >
+          <Card className="rounded-2xl shadow-lg h-full flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-base sm:text-lg font-medium">AI Savings Tip</CardTitle>
+              <Image src="https://placehold.co/24x24.png" alt="AI Icon" width={24} height={24} data-ai-hint="robot lightbulb"/>
+            </CardHeader>
+            <CardContent className="flex-grow">
+              <p className="text-sm">Review your streaming subscriptions. You could save $25/month!</p>
+              <p className="text-xs text-muted-foreground pt-1">Actual AI insights based on your data are available on the Insights page.</p>
+            </CardContent>
+            <CardFooter>
+              <Link href="/insights" className="w-full">
+                <Button variant="outline" className="w-full">Get Personalized Insights</Button>
+              </Link>
+            </CardFooter>
+          </Card>
+        </motion.div>
       </div>
     </div>
   );
@@ -505,5 +546,7 @@ const categoryDisplayNames: Record<AssetCategory | string, string> = {
   property: "Properties",
   mutualfund: "Mutual Funds",
 };
+
+    
 
     
