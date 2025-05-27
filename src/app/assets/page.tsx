@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,10 +13,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, ExternalLink, AlertTriangle, Search, Loader2, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
-// ChartContainer, ChartTooltip, ChartTooltipContent are not used directly here anymore for asset cards
 import { useToast } from "@/hooks/use-toast";
 import { useAssets, type Asset as ContextAsset, type AssetCategory } from '@/contexts/AssetContext';
-import { motion } from 'framer-motion'; // Assuming framer-motion is still a dependency for animations
+import { motion, AnimatePresence } from 'framer-motion'; // Added AnimatePresence
 
 const assetIcons: Record<AssetCategory | 'overview', React.ReactNode> = {
   overview: <WalletCards className="h-5 w-5 text-muted-foreground" />,
@@ -171,6 +170,11 @@ export default function AssetsPage() {
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Log assets from context to debug empty page issue
+  useEffect(() => {
+    console.log("[AssetsPage] allAssets from context:", allAssets);
+  }, [allAssets]);
 
 
   const activeTab = useMemo(() => {
