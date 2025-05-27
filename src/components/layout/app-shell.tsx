@@ -2,7 +2,8 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   SidebarProvider,
   Sidebar,
@@ -15,9 +16,32 @@ import { SiteHeader } from '@/components/layout/site-header';
 import { MainNav } from '@/components/layout/main-nav';
 import { NAV_LINKS, BOTTOM_NAV_LINKS } from '@/constants/nav-links';
 import Link from 'next/link';
-
+import { Loader2 } from 'lucide-react';
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const [isLoading, setIsLoading] = useState(false);
+  const previousPathnameRef = useRef(pathname);
+
+  useEffect(() => {
+    // Only show loader if the pathname has actually changed from the last one we processed
+    if (previousPathnameRef.current !== pathname) {
+      setIsLoading(true);
+
+      // Set a timer to hide the loader after a short period.
+      // This gives a visual cue during client-side navigation.
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+        previousPathnameRef.current = pathname; // Update the ref to the new pathname after "loading"
+      }, 300); // Adjust duration as needed (e.g., 300-500ms)
+
+      return () => clearTimeout(timer);
+    } else {
+      // If the pathname hasn't changed (e.g. on initial load or a non-route query param change),
+      // ensure loading is false.
+      setIsLoading(false);
+    }
+  }, [pathname]);
 
   return (
     <SidebarProvider defaultOpen>
@@ -66,7 +90,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       </Sidebar>
       <SidebarInset className="flex flex-col">
         <SiteHeader />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 relative"> {/* Added position:relative for overlay */}
+          {isLoading && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/75 backdrop-blur-sm">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            </div>
+          )}
           {children}
         </main>
       </SidebarInset>
