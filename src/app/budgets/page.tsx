@@ -31,7 +31,7 @@ const budgetPeriods = [
 
 const budgetCategories = ['Groceries', 'Dining Out', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Other'];
 
-const BudgetCard = React.memo(function BudgetCard({ budget, onEdit, onDelete }: { budget: Budget; onEdit: (budget: Budget) => void; onDelete: (id: string) => void; }) {
+const BudgetCard = ({ budget, onEdit, onDelete }: { budget: Budget; onEdit: (budget: Budget) => void; onDelete: (id: string) => void; }) => {
   const spentPercentage = budget.amount > 0 ? Math.min((budget.spent / budget.amount) * 100, 100) : 0;
   
   const getProgressColor = (percentage: number) => {
@@ -69,8 +69,7 @@ const BudgetCard = React.memo(function BudgetCard({ budget, onEdit, onDelete }: 
       </CardFooter>
     </Card>
   );
-});
-BudgetCard.displayName = 'BudgetCard';
+};
 
 
 export default function BudgetsPage() {

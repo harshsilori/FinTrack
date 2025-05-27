@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,10 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, WalletCards, Coins, Info, AlertTriangle, Search } from 'lucide-react';
+import { PlusCircle, Edit3, Trash2, Landmark, BarChartBig, Bitcoin, Building2, TrendingUp, RefreshCcw, WalletCards, TrendingDown, Coins, Info, ExternalLink, AlertTriangle, Search, Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { BarChart, Line, LineChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { useToast } from "@/hooks/use-toast";
 import { useAssets, type Asset as ContextAsset, type AssetCategory } from '@/contexts/AssetContext';
+
 
 const assetIcons: Record<AssetCategory, React.ReactNode> = {
   bank: <Landmark className="h-8 w-8 text-blue-500" />,
@@ -54,10 +57,10 @@ const categoryDisplayNames: Record<AssetCategory | 'overview', string> = {
 
 const assetCategories: AssetCategory[] = ['bank', 'stock', 'crypto', 'property', 'mutualfund'];
 
-const AssetCardComponent = React.memo(function AssetCardComponent({ asset, onEdit, onDelete }: { asset: ContextAsset, onEdit: (asset: ContextAsset) => void, onDelete: (id: string) => void }) {
+const AssetCardComponent = ({ asset, onEdit, onDelete }: { asset: ContextAsset, onEdit: (asset: ContextAsset) => void, onDelete: (id: string) => void }) => {
   const marketValue = (asset.category === 'bank' || asset.category === 'property')
     ? asset.currentPrice
-    : asset.currentPrice * asset.quantity;
+    : asset.currentPrice * (asset.quantity || 0);
 
   const isTrackableAsset = asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund';
   
@@ -73,7 +76,7 @@ const AssetCardComponent = React.memo(function AssetCardComponent({ asset, onEdi
 
   let allTimeGainLoss = 0;
   let allTimeGainLossPercent = 0;
-  if (isTrackableAsset && asset.purchasePrice !== undefined && asset.currentPrice !== undefined) {
+  if (isTrackableAsset && asset.purchasePrice !== undefined && asset.currentPrice !== undefined && asset.quantity !== undefined) {
     allTimeGainLoss = (asset.currentPrice - asset.purchasePrice) * asset.quantity;
     const totalPurchaseCostForAsset = asset.purchasePrice * asset.quantity;
      if (totalPurchaseCostForAsset !== 0) {
@@ -83,7 +86,7 @@ const AssetCardComponent = React.memo(function AssetCardComponent({ asset, onEdi
      }
   }
 
-  const formatCurrency = (value: number | undefined, currencyCode: string) => {
+  const formatCurrency = (value: number | undefined, currencyCode: string = 'USD') => {
     if (value === undefined) return 'N/A';
     return value.toLocaleString(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
@@ -105,7 +108,7 @@ const AssetCardComponent = React.memo(function AssetCardComponent({ asset, onEdi
           <p className="text-xs text-muted-foreground">
               {asset.category === 'bank' || asset.category === 'property'
               ? 'Current Value'
-              : `${asset.quantity.toLocaleString()} units @ ${formatCurrency(asset.currentPrice, asset.currency)}/unit (Manual Entry)`
+              : `${(asset.quantity || 0).toLocaleString()} units @ ${formatCurrency(asset.currentPrice, asset.currency)}/unit`
               }
           </p>
         </div>
@@ -141,8 +144,7 @@ const AssetCardComponent = React.memo(function AssetCardComponent({ asset, onEdi
       </CardFooter>
     </Card>
   );
-});
-AssetCardComponent.displayName = 'AssetCardComponent';
+};
 
 
 export default function AssetsPage() {
@@ -160,8 +162,9 @@ export default function AssetsPage() {
     if (tabParam && (assetCategories.includes(tabParam as AssetCategory) || tabParam === 'overview')) {
         return tabParam;
     }
-    return 'overview';
+    return 'overview'; // Default to overview if no valid category or no category param
   }, [searchParams]);
+
 
   const handleTabChange = (newTabValue: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -177,7 +180,7 @@ export default function AssetsPage() {
     if (activeTab && activeTab !== 'overview') {
       return allAssets.filter(asset => asset.category === activeTab);
     }
-    return []; 
+    return []; // Empty for overview tab as it has its own summary section
   }, [allAssets, activeTab]);
 
   const openForm = (asset?: ContextAsset) => {
@@ -188,11 +191,11 @@ export default function AssetsPage() {
       const newInitialState: Partial<ContextAsset> = {
         ...initialAssetFormState,
         category: prefilledCategory as AssetCategory,
-        currency: 'USD', 
-        currentPrice: 0, 
+        currency: 'USD',
+        currentPrice: 0,
       };
        if (prefilledCategory === 'bank' || prefilledCategory === 'property') {
-        newInitialState.quantity = 1;
+        newInitialState.quantity = 1; // Default quantity for non-trackable
         delete newInitialState.purchasePrice; 
         delete newInitialState.tickerSymbol; 
       } else {
@@ -210,13 +213,13 @@ export default function AssetsPage() {
       toast({ title: "Error", description: "Please fill name, category, currency, and a valid current price (>=0).", variant: "destructive" });
       return;
     }
-
+    
     const isTrackableCategory = currentAssetForForm.category === 'stock' || currentAssetForForm.category === 'crypto' || currentAssetForForm.category === 'mutualfund';
 
     const finalName = currentAssetForForm.name;
     const quantityToSave = (currentAssetForForm.category === 'bank' || currentAssetForForm.category === 'property') ? 1 : (Number(currentAssetForForm.quantity) || 0);
     const finalTickerSymbol = isTrackableCategory ? currentAssetForForm.tickerSymbol?.toUpperCase() : undefined;
-
+    
     if (isTrackableCategory) {
          if (currentAssetForForm.quantity === undefined || currentAssetForForm.quantity <= 0) {
             toast({ title: "Error", description: "Quantity must be greater than zero for trackable assets.", variant: "destructive" });
@@ -228,35 +231,24 @@ export default function AssetsPage() {
         }
     }
 
+    const assetPayload = {
+      name: finalName,
+      category: currentAssetForForm.category!,
+      currency: currentAssetForForm.currency!,
+      quantity: quantityToSave,
+      currentPrice: Number(currentAssetForForm.currentPrice) || 0,
+      ...(isTrackableCategory && { 
+        tickerSymbol: finalTickerSymbol,
+        purchasePrice: Number(currentAssetForForm.purchasePrice) || 0,
+       }),
+    };
+
     if (currentAssetForForm.id) { 
-      const payloadForUpdate: Partial<ContextAsset> & { id: string } = {
-        id: currentAssetForForm.id,
-        name: finalName,
-        category: currentAssetForForm.category!,
-        currency: currentAssetForForm.currency!,
-        quantity: quantityToSave,
-        currentPrice: Number(currentAssetForForm.currentPrice) || 0,
-      };
-      if (isTrackableCategory) {
-        payloadForUpdate.tickerSymbol = finalTickerSymbol;
-        payloadForUpdate.purchasePrice = Number(currentAssetForForm.purchasePrice) || 0;
-      }
-      updateAsset(payloadForUpdate);
-      toast({ title: "Asset Updated", description: `${payloadForUpdate.name} has been updated.` });
+      updateAsset({ id: currentAssetForForm.id, ...assetPayload });
+      toast({ title: "Asset Updated", description: `${assetPayload.name} has been updated.` });
     } else { 
-      const newAssetPayload: Omit<ContextAsset, 'id' | 'lastUpdated'> & { purchasePrice?: number; tickerSymbol?: string; } = {
-        name: finalName,
-        category: currentAssetForForm.category!,
-        currency: currentAssetForForm.currency!,
-        quantity: quantityToSave,
-        currentPrice: Number(currentAssetForForm.currentPrice) || 0,
-      };
-      if (isTrackableCategory) {
-        newAssetPayload.purchasePrice = Number(currentAssetForForm.purchasePrice) || 0;
-        newAssetPayload.tickerSymbol = finalTickerSymbol;
-      }
-      addAsset(newAssetPayload);
-      toast({ title: "Asset Added", description: `${newAssetPayload.name} has been added.` });
+      addAsset(assetPayload as Omit<ContextAsset, 'id' | 'lastUpdated'>);
+      toast({ title: "Asset Added", description: `${assetPayload.name} has been added.` });
     }
     setIsFormOpen(false);
     setCurrentAssetForForm(initialAssetFormState);
@@ -267,12 +259,12 @@ export default function AssetsPage() {
     toast({ title: "Asset Deleted", description: `Asset has been removed.`, variant: "destructive" });
   };
 
-  const formatCurrency = (value: number | undefined, currencyCode: string) => {
+  const formatCurrency = (value: number | undefined, currencyCode: string = 'USD') => {
     if (value === undefined) return 'N/A';
     return value.toLocaleString(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const calculateTotals = useCallback((assetsToSummarize: ContextAsset[]) => {
+  const calculateTotals = (assetsToSummarize: ContextAsset[]) => {
     const totals: Record<string, {marketValue: number, allTimeGain: number, totalPurchaseCost: number }> = {};
     assetsToSummarize.forEach(asset => {
       if (!totals[asset.currency]) {
@@ -280,20 +272,20 @@ export default function AssetsPage() {
       }
       const marketValue = (asset.category === 'bank' || asset.category === 'property')
         ? asset.currentPrice
-        : asset.currentPrice * asset.quantity;
+        : asset.currentPrice * (asset.quantity || 0);
       totals[asset.currency].marketValue += marketValue;
 
       const isTrackableAsset = asset.category === 'stock' || asset.category === 'crypto' || asset.category === 'mutualfund';
-      if (isTrackableAsset && asset.purchasePrice !== undefined) {
+      if (isTrackableAsset && asset.purchasePrice !== undefined && asset.quantity !== undefined) {
           const purchaseCostForAsset = asset.purchasePrice * asset.quantity;
           totals[asset.currency].allTimeGain += (marketValue - purchaseCostForAsset);
           totals[asset.currency].totalPurchaseCost += purchaseCostForAsset;
       }
     });
     return totals;
-  }, []);
+  };
 
-  const portfolioTotalsByCurrency = useMemo(() => calculateTotals(allAssets), [allAssets, calculateTotals]);
+  const portfolioTotalsByCurrency = useMemo(() => calculateTotals(allAssets), [allAssets]);
 
   const categorySpecificTotals = useMemo(() => {
     if (activeTab && activeTab !== 'overview') {
@@ -301,7 +293,7 @@ export default function AssetsPage() {
       return calculateTotals(filteredAssetsForTab);
     }
     return {};
-  }, [allAssets, activeTab, calculateTotals]);
+  }, [allAssets, activeTab]);
 
 
   const handleCategoryChangeInForm = (value: AssetCategory) => {
@@ -575,4 +567,3 @@ export default function AssetsPage() {
     </div>
   );
 }
-

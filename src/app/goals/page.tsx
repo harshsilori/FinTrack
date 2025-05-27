@@ -34,7 +34,7 @@ const initialGoalFormState: Partial<ContextGoal> = {
 };
 
 
-const GoalCardComponent = React.memo(function GoalCardComponent({ goal, onEdit, onDelete, onAddFunds }: { goal: ContextGoal; onEdit: (goal: ContextGoal) => void; onDelete: (id: string) => void; onAddFunds: (id: string) => void; }) {
+const GoalCardComponent = ({ goal, onEdit, onDelete, onAddFunds }: { goal: ContextGoal; onEdit: (goal: ContextGoal) => void; onDelete: (id: string) => void; onAddFunds: (id: string) => void; }) => {
   const progressPercentage = goal.targetAmount > 0 ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100) : 0;
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -111,8 +111,7 @@ const GoalCardComponent = React.memo(function GoalCardComponent({ goal, onEdit, 
       </CardFooter>
     </Card>
   );
-});
-GoalCardComponent.displayName = 'GoalCardComponent';
+};
 
 
 export default function GoalsPage() {
@@ -142,7 +141,7 @@ export default function GoalsPage() {
       name: currentGoalForForm.name,
       targetAmount: Number(currentGoalForForm.targetAmount),
       currentAmount: Number(currentGoalForForm.currentAmount || 0),
-      targetDate: currentGoalForForm.targetDate || undefined, // Already in yyyy-MM-dd
+      targetDate: currentGoalForForm.targetDate || undefined, 
       icon: currentGoalForForm.icon || 'Target',
     };
 
@@ -170,7 +169,7 @@ export default function GoalsPage() {
   const handleAddContribution = () => {
     if (contributionGoalId && contributionAmount > 0) {
       addContribution(contributionGoalId, contributionAmount);
-      toast({ title: "Contribution Added", description: `Added ${formatCurrency(contributionAmount, 'USD')} to your goal.` }); // Assuming USD for now
+      toast({ title: "Contribution Added", description: `Added ${formatCurrency(contributionAmount, 'USD')} to your goal.` }); 
       setContributionGoalId(null);
       setContributionAmount(0);
     } else {
