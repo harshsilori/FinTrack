@@ -203,31 +203,31 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Settings</h1>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Settings</h1>
       </div>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
           Manage your account and application preferences.
         </p>
 
       <Card className="rounded-2xl shadow-lg">
         <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="flex items-center gap-2"><UserCircle className="h-5 w-5 text-primary"/> Profile Settings</CardTitle>
-          <CardDescription>Update your personal information. (Note: Password changes are handled through re-registration for local accounts)</CardDescription>
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg md:text-xl"><UserCircle className="h-5 w-5 text-primary"/> Profile Settings</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Update your personal information. (Note: Password changes are handled through re-registration for local accounts)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-4 sm:p-6">
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="name">Full Name</Label>
-              <Input id="name" placeholder="Your Name" defaultValue="Demo User" />
+              <Label htmlFor="name" className="text-xs sm:text-sm">Full Name</Label>
+              <Input id="name" placeholder="Your Name" defaultValue="Demo User" className="text-sm h-9 sm:h-10"/>
             </div>
             <div>
-              <Label htmlFor="email">Email Address</Label>
-              <Input id="email" type="email" placeholder="your@email.com" defaultValue="demo@example.com" disabled />
+              <Label htmlFor="email" className="text-xs sm:text-sm">Email Address</Label>
+              <Input id="email" type="email" placeholder="your@email.com" defaultValue="demo@example.com" disabled className="text-sm h-9 sm:h-10"/>
             </div>
           </div>
-          <Button disabled>Save Profile (Name Only)</Button>
+          <Button disabled className="text-xs sm:text-sm">Save Profile (Name Only)</Button>
            <p className="text-xs text-muted-foreground">
             Email is tied to your local account and cannot be changed here. To change your password, please sign out and re-register.
           </p>
@@ -238,14 +238,14 @@ export default function SettingsPage() {
 
       <Card className="rounded-2xl shadow-lg">
         <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary"/> Theme Settings</CardTitle>
-          <CardDescription>Customize the look and feel of the application.</CardDescription>
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg md:text-xl"><Palette className="h-5 w-5 text-primary"/> Theme Settings</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Customize the look and feel of the application.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 p-4 sm:p-6">
            <div className="flex items-center justify-between">
             <Label htmlFor="dark-mode" className="flex flex-col space-y-1">
-              <span>Dark Mode</span>
-              <span className="font-normal leading-snug text-muted-foreground">
+              <span className="text-xs sm:text-sm">Dark Mode</span>
+              <span className="font-normal leading-snug text-muted-foreground text-xs sm:text-sm">
                 Toggle between light and dark themes.
               </span>
             </Label>
@@ -257,23 +257,23 @@ export default function SettingsPage() {
           </div>
           
           <div>
-            <Label className="text-base">Accent Color</Label>
-            <p className="text-sm text-muted-foreground mb-3">Choose an accent color palette for the app.</p>
-            <RadioGroup value={accentTheme} onValueChange={handleAccentThemeChange} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Label className="text-sm sm:text-base">Accent Color</Label>
+            <p className="text-xs sm:text-sm text-muted-foreground mb-3">Choose an accent color palette for the app.</p>
+            <RadioGroup value={accentTheme} onValueChange={handleAccentThemeChange} className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {themeOptions.map(theme => (
                 <Label 
                   key={theme.value} 
                   htmlFor={theme.value}
-                  className="flex flex-col items-start cursor-pointer rounded-md border border-muted p-3 sm:p-4 hover:border-primary data-[state=checked]:border-primary data-[state=checked]:ring-2 data-[state=checked]:ring-primary"
+                  className="flex flex-col items-start cursor-pointer rounded-md border border-muted p-3 sm:p-4 hover:border-primary data-[state=checked]:border-primary data-[state=checked]:ring-1 sm:data-[state=checked]:ring-2 data-[state=checked]:ring-primary"
                   data-state={accentTheme === theme.value ? 'checked' : 'unchecked'}
                 >
                   <div className="flex items-center justify-between w-full">
-                    <span className="font-medium text-sm sm:text-base">{theme.label}</span>
-                    <RadioGroupItem value={theme.value} id={theme.value} className="shrink-0" />
+                    <span className="font-medium text-xs sm:text-sm">{theme.label}</span>
+                    <RadioGroupItem value={theme.value} id={theme.value} className="shrink-0 h-3 w-3 sm:h-4 sm:w-4" />
                   </div>
                   <div className="flex gap-2 mt-2">
-                    <div className="h-5 w-8 sm:h-6 sm:w-10 rounded" style={{ backgroundColor: theme.primary }}></div>
-                    <div className="h-5 w-8 sm:h-6 sm:w-10 rounded" style={{ backgroundColor: theme.accent }}></div>
+                    <div className="h-4 w-6 sm:h-5 sm:w-8 rounded" style={{ backgroundColor: theme.primary }}></div>
+                    <div className="h-4 w-6 sm:h-5 sm:w-8 rounded" style={{ backgroundColor: theme.accent }}></div>
                   </div>
                 </Label>
               ))}
@@ -286,14 +286,14 @@ export default function SettingsPage() {
       
       <Card className="rounded-2xl shadow-lg">
         <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-primary"/> Notification Preferences</CardTitle>
-          <CardDescription>Control how you receive notifications. (Functionality not implemented)</CardDescription>
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg md:text-xl"><Bell className="h-5 w-5 text-primary"/> Notification Preferences</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Control how you receive notifications. (Functionality not implemented)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <Label htmlFor="email-notifications" className="flex flex-col space-y-1">
-              <span>Email Notifications</span>
-              <span className="font-normal leading-snug text-muted-foreground">
+              <span className="text-xs sm:text-sm">Email Notifications</span>
+              <span className="font-normal leading-snug text-muted-foreground text-xs sm:text-sm">
                 Receive updates and alerts via email.
               </span>
             </Label>
@@ -301,14 +301,14 @@ export default function SettingsPage() {
           </div>
           <div className="flex items-center justify-between">
             <Label htmlFor="push-notifications" className="flex flex-col space-y-1">
-              <span>Push Notifications</span>
-              <span className="font-normal leading-snug text-muted-foreground">
+              <span className="text-xs sm:text-sm">Push Notifications</span>
+              <span className="font-normal leading-snug text-muted-foreground text-xs sm:text-sm">
                 Get real-time alerts on your device (if supported).
               </span>
             </Label>
             <Switch id="push-notifications" disabled />
           </div>
-          <Button disabled>Save Notifications</Button>
+          <Button disabled className="text-xs sm:text-sm">Save Notifications</Button>
         </CardContent>
       </Card>
 
@@ -316,17 +316,17 @@ export default function SettingsPage() {
       
       <Card className="rounded-2xl shadow-lg">
         <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-primary"/> Data Management</CardTitle>
-          <CardDescription>Manage your application data. Backups are stored locally as JSON files.</CardDescription>
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg md:text-xl"><Database className="h-5 w-5 text-primary"/> Data Management</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Manage your application data. Backups are stored locally as JSON files.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-4 sm:p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Button onClick={handleBackupData} variant="outline" className="w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <Button onClick={handleBackupData} variant="outline" className="w-full text-xs sm:text-sm">
                     <DownloadCloud className="mr-2 h-4 w-4" /> Backup All Data
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                     <Button variant="outline" className="w-full">
+                     <Button variant="outline" className="w-full text-xs sm:text-sm">
                        <UploadCloud className="mr-2 h-4 w-4" /> Restore Data from Backup
                     </Button>
                   </AlertDialogTrigger>
@@ -356,10 +356,10 @@ export default function SettingsPage() {
            <p className="text-xs text-muted-foreground">
             Backup creates a JSON file of your data. Restore will replace all current data with the backup.
           </p>
-           <Separator className="my-4"/>
+           <Separator className="my-3 sm:my-4"/>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive" className="w-full sm:w-auto">
+              <Button variant="destructive" className="w-full sm:w-auto text-xs sm:text-sm">
                 <AlertTriangle className="mr-2 h-4 w-4" /> Load Sample Data
               </Button>
             </AlertDialogTrigger>

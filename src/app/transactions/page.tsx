@@ -8,11 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { PlusCircle, Trash2, Save, Upload, Camera, AlertTriangle, Edit3, FilterX, Search as SearchIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { useTransactions, type Transaction } from '@/contexts/TransactionContext';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { parseISO, isValid, format } from 'date-fns';
 
 const generateClientUniqueId = () => Math.random().toString(36).substring(2, 11);
@@ -252,55 +252,55 @@ export default function TransactionsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 md:gap-4">
         <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Transaction Management</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Transaction Management</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
             Add new transactions or manage your existing entries.
             </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-            <Button variant="outline" onClick={() => handleImportPlaceholder("Bank Statement Import (PDF/CSV)")} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={() => handleImportPlaceholder("Bank Statement Import (PDF/CSV)")} className="w-full sm:w-auto text-xs sm:text-sm">
                 <Upload className="mr-2 h-4 w-4" /> Import Statement
             </Button>
-            <Button variant="outline" onClick={() => handleImportPlaceholder("Bill Scanner (Image OCR)")} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={() => handleImportPlaceholder("Bill Scanner (Image OCR)")} className="w-full sm:w-auto text-xs sm:text-sm">
                 <Camera className="mr-2 h-4 w-4" /> Scan Bill
             </Button>
         </div>
       </div>
 
       <Card className="rounded-2xl shadow-lg">
-        <CardHeader>
-          <CardTitle>Batch Transaction Entry</CardTitle>
-          <CardDescription>Enter details for multiple transactions below. Click "Save Entered Transactions" at the bottom when done.</CardDescription>
+        <CardHeader className="p-3 sm:p-4 md:p-6">
+          <CardTitle className="text-base sm:text-lg md:text-xl">Batch Transaction Entry</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Enter details for multiple transactions below. Click "Save Entered Transactions" at the bottom when done.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 p-3 sm:p-4 md:p-6">
-          {!isMounted && <p className="text-muted-foreground text-center py-4">Loading transaction entry form...</p>}
+        <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 md:p-6">
+          {!isMounted && <p className="text-muted-foreground text-center py-4 text-sm">Loading transaction entry form...</p>}
           {isMounted && formTransactions.map((tx) => (
             <div key={tx.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 items-end p-2 md:p-3 border rounded-lg shadow-sm bg-card">
               <div className="md:col-span-2">
-                <Label htmlFor={`date-${tx.id}`}>Date</Label>
+                <Label htmlFor={`date-${tx.id}`} className="text-xs">Date</Label>
                 <Input
                   id={`date-${tx.id}`}
                   type="date"
                   value={tx.date}
                   onChange={(e) => handleInputChange(tx.id, 'date', e.target.value)}
-                  className="text-sm"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
                 />
               </div>
               <div className="md:col-span-3">
-                <Label htmlFor={`description-${tx.id}`}>Description</Label>
+                <Label htmlFor={`description-${tx.id}`} className="text-xs">Description</Label>
                 <Input
                   id={`description-${tx.id}`}
                   placeholder="e.g., Coffee, Salary"
                   value={tx.description}
                   onChange={(e) => handleInputChange(tx.id, 'description', e.target.value)}
-                  className="text-sm"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
                 />
               </div>
               <div className="md:col-span-2">
-                <Label htmlFor={`amount-${tx.id}`}>Amount</Label>
+                <Label htmlFor={`amount-${tx.id}`} className="text-xs">Amount</Label>
                 <Input
                   id={`amount-${tx.id}`}
                   type="number"
@@ -309,16 +309,16 @@ export default function TransactionsPage() {
                   onChange={(e) => handleInputChange(tx.id, 'amount', e.target.value)}
                   min="0.01"
                   step="0.01"
-                  className="text-sm"
+                  className="text-xs sm:text-sm h-9 sm:h-10"
                 />
               </div>
               <div className="md:col-span-2">
-                <Label htmlFor={`type-${tx.id}`}>Type</Label>
+                <Label htmlFor={`type-${tx.id}`} className="text-xs">Type</Label>
                 <Select
                   value={tx.type}
                   onValueChange={(value: 'income' | 'expense') => handleTypeChange(tx.id, value)}
                 >
-                  <SelectTrigger id={`type-${tx.id}`} className="text-sm">
+                  <SelectTrigger id={`type-${tx.id}`} className="text-xs sm:text-sm h-9 sm:h-10">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -328,12 +328,12 @@ export default function TransactionsPage() {
                 </Select>
               </div>
               <div className="md:col-span-2">
-                <Label htmlFor={`category-${tx.id}`}>Category</Label>
+                <Label htmlFor={`category-${tx.id}`} className="text-xs">Category</Label>
                  <Select
                   value={tx.category || (appDefinedCategories[0] || '')}
                   onValueChange={(value) => handleCategoryChange(tx.id, value)}
                 >
-                  <SelectTrigger id={`category-${tx.id}`} className="text-sm">
+                  <SelectTrigger id={`category-${tx.id}`} className="text-xs sm:text-sm h-9 sm:h-10">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -348,20 +348,21 @@ export default function TransactionsPage() {
                   onClick={() => removeTransactionRow(tx.id)}
                   aria-label="Remove transaction"
                   disabled={formTransactions.length <= 1}
+                  className="h-9 w-9 sm:h-10 sm:w-10"
                 >
-                  <Trash2 className="h-5 w-5 text-destructive" />
+                  <Trash2 className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" />
                 </Button>
               </div>
             </div>
           ))}
           {isMounted && (
-            <Button variant="outline" onClick={addTransactionRow} className="mt-4 w-full md:w-auto">
+            <Button variant="outline" onClick={addTransactionRow} className="mt-3 sm:mt-4 w-full md:w-auto text-xs sm:text-sm">
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Another Transaction Row
             </Button>
           )}
         </CardContent>
         <CardFooter className="p-3 sm:p-4 md:p-6">
-          <Button onClick={handleSaveAllBatch} className="w-full md:w-auto" disabled={!isMounted || formTransactions.length === 0}>
+          <Button onClick={handleSaveAllBatch} className="w-full md:w-auto text-xs sm:text-sm" disabled={!isMounted || formTransactions.length === 0}>
             <Save className="mr-2 h-4 w-4" /> Save Entered Transactions
           </Button>
         </CardFooter>
@@ -378,23 +379,23 @@ export default function TransactionsPage() {
               Modify the details of your transaction.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
-              <Label htmlFor="edit-date" className="text-left sm:text-right">Date</Label>
-              <Input id="edit-date" type="date" value={currentTransactionForEdit.date} onChange={(e) => handleEditFormChange('date', e.target.value)} className="col-span-1 sm:col-span-3" />
+          <div className="grid gap-3 sm:gap-4 py-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 sm:gap-x-4 gap-y-2">
+              <Label htmlFor="edit-date" className="text-left sm:text-right text-xs sm:text-sm">Date</Label>
+              <Input id="edit-date" type="date" value={currentTransactionForEdit.date} onChange={(e) => handleEditFormChange('date', e.target.value)} className="col-span-1 sm:col-span-3 text-sm" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
-              <Label htmlFor="edit-description" className="text-left sm:text-right">Description</Label>
-              <Input id="edit-description" value={currentTransactionForEdit.description} onChange={(e) => handleEditFormChange('description', e.target.value)} className="col-span-1 sm:col-span-3" placeholder="e.g., Lunch meeting" />
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 sm:gap-x-4 gap-y-2">
+              <Label htmlFor="edit-description" className="text-left sm:text-right text-xs sm:text-sm">Description</Label>
+              <Input id="edit-description" value={currentTransactionForEdit.description} onChange={(e) => handleEditFormChange('description', e.target.value)} className="col-span-1 sm:col-span-3 text-sm" placeholder="e.g., Lunch meeting" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
-              <Label htmlFor="edit-amount" className="text-left sm:text-right">Amount</Label>
-              <Input id="edit-amount" type="number" value={currentTransactionForEdit.amount.toString()} onChange={(e) => handleEditAmountChange(e.target.value)} className="col-span-1 sm:col-span-3" placeholder="0.00" min="0.01" step="0.01" />
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 sm:gap-x-4 gap-y-2">
+              <Label htmlFor="edit-amount" className="text-left sm:text-right text-xs sm:text-sm">Amount</Label>
+              <Input id="edit-amount" type="number" value={currentTransactionForEdit.amount.toString()} onChange={(e) => handleEditAmountChange(e.target.value)} className="col-span-1 sm:col-span-3 text-sm" placeholder="0.00" min="0.01" step="0.01" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
-              <Label htmlFor="edit-type" className="text-left sm:text-right">Type</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 sm:gap-x-4 gap-y-2">
+              <Label htmlFor="edit-type" className="text-left sm:text-right text-xs sm:text-sm">Type</Label>
               <Select value={currentTransactionForEdit.type} onValueChange={(value: 'income' | 'expense') => handleEditFormChange('type', value)}>
-                <SelectTrigger id="edit-type" className="col-span-1 sm:col-span-3">
+                <SelectTrigger id="edit-type" className="col-span-1 sm:col-span-3 text-sm">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -403,10 +404,10 @@ export default function TransactionsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-4 gap-y-2">
-              <Label htmlFor="edit-category" className="text-left sm:text-right">Category</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-x-3 sm:gap-x-4 gap-y-2">
+              <Label htmlFor="edit-category" className="text-left sm:text-right text-xs sm:text-sm">Category</Label>
               <Select value={currentTransactionForEdit.category} onValueChange={(value) => handleEditFormChange('category', value)}>
-                <SelectTrigger id="edit-category" className="col-span-1 sm:col-span-3">
+                <SelectTrigger id="edit-category" className="col-span-1 sm:col-span-3 text-sm">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -423,24 +424,24 @@ export default function TransactionsPage() {
       </Dialog>
 
       <Card className="rounded-2xl shadow-lg">
-        <CardHeader>
-          <CardTitle>Filter Transactions</CardTitle>
-          <CardDescription>Refine the list of transactions displayed below.</CardDescription>
+        <CardHeader className="p-3 sm:p-4 md:p-6">
+          <CardTitle className="text-base sm:text-lg md:text-xl">Filter Transactions</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Refine the list of transactions displayed below.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 p-3 sm:p-4 md:p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+        <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 md:p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 items-end">
             <div>
-              <Label htmlFor="filter-start-date">Start Date</Label>
-              <Input id="filter-start-date" type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} className="text-sm" />
+              <Label htmlFor="filter-start-date" className="text-xs sm:text-sm">Start Date</Label>
+              <Input id="filter-start-date" type="date" value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)} className="text-xs sm:text-sm h-9 sm:h-10" />
             </div>
             <div>
-              <Label htmlFor="filter-end-date">End Date</Label>
-              <Input id="filter-end-date" type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} className="text-sm" />
+              <Label htmlFor="filter-end-date" className="text-xs sm:text-sm">End Date</Label>
+              <Input id="filter-end-date" type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} className="text-xs sm:text-sm h-9 sm:h-10" />
             </div>
             <div>
-              <Label htmlFor="filter-type">Type</Label>
+              <Label htmlFor="filter-type" className="text-xs sm:text-sm">Type</Label>
               <Select value={filterType} onValueChange={(value: 'all' | 'income' | 'expense') => setFilterType(value)}>
-                <SelectTrigger id="filter-type" className="text-sm">
+                <SelectTrigger id="filter-type" className="text-xs sm:text-sm h-9 sm:h-10">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -451,9 +452,9 @@ export default function TransactionsPage() {
               </Select>
             </div>
             <div className="sm:col-span-2 lg:col-span-1">
-              <Label htmlFor="filter-category">Category</Label>
+              <Label htmlFor="filter-category" className="text-xs sm:text-sm">Category</Label>
               <Select value={filterCategory} onValueChange={(value) => setFilterCategory(value)}>
-                <SelectTrigger id="filter-category" className="text-sm">
+                <SelectTrigger id="filter-category" className="text-xs sm:text-sm h-9 sm:h-10">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -464,21 +465,21 @@ export default function TransactionsPage() {
               </Select>
             </div>
              <div className="relative sm:col-span-2 lg:col-span-1">
-                <Label htmlFor="filter-search-term">Search Description</Label>
+                <Label htmlFor="filter-search-term" className="text-xs sm:text-sm">Search Description</Label>
                 <div className="relative">
                     <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input 
                     id="filter-search-term" 
                     type="text" 
-                    placeholder="Search descriptions..." 
+                    placeholder="Search..." 
                     value={searchTerm} 
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 text-sm" 
+                    className="pl-8 text-xs sm:text-sm h-9 sm:h-10" 
                     />
                 </div>
             </div>
              <div className="sm:col-span-2 lg:col-span-1 flex items-end">
-              <Button onClick={clearFilters} variant="outline" className="w-full text-sm">
+              <Button onClick={clearFilters} variant="outline" className="w-full text-xs sm:text-sm h-9 sm:h-10">
                 <FilterX className="mr-2 h-4 w-4" /> Clear Filters
               </Button>
             </div>
@@ -487,27 +488,27 @@ export default function TransactionsPage() {
       </Card>
 
       <Card className="rounded-2xl shadow-lg">
-        <CardHeader>
-            <CardTitle>All Transactions</CardTitle>
-            <CardDescription>A log of all your recorded income and expenses. Use filters above to narrow down the list.</CardDescription>
+        <CardHeader className="p-3 sm:p-4 md:p-6">
+            <CardTitle className="text-base sm:text-lg md:text-xl">All Transactions</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">A log of all your recorded income and expenses. Use filters above to narrow down the list.</CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0 sm:p-2 md:p-4">
+        <CardContent className="overflow-x-auto p-0"> {/* Removed horizontal padding on card content for table */}
             {filteredTransactions.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8 px-4">
-                    <AlertTriangle className="mx-auto h-12 w-12 mb-4 text-primary" />
-                    <p className="text-lg font-semibold">No transactions match your filters!</p>
-                    <p>Try adjusting your filters or add new transactions.</p>
+                    <AlertTriangle className="mx-auto h-10 w-10 sm:h-12 sm:w-12 mb-4 text-primary" />
+                    <p className="text-md sm:text-lg font-semibold">No transactions match your filters!</p>
+                    <p className="text-sm">Try adjusting your filters or add new transactions.</p>
                 </div>
             ) : (
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="min-w-[100px] text-xs sm:text-sm">Date</TableHead>
-                            <TableHead className="min-w-[150px] sm:min-w-[200px] text-xs sm:text-sm">Description</TableHead>
-                            <TableHead className="min-w-[100px] sm:min-w-[120px] text-xs sm:text-sm">Category</TableHead>
-                            <TableHead className="min-w-[70px] sm:min-w-[80px] text-xs sm:text-sm">Type</TableHead>
-                            <TableHead className="text-right min-w-[90px] sm:min-w-[100px] text-xs sm:text-sm">Amount</TableHead>
-                            <TableHead className="text-center min-w-[80px] sm:min-w-[100px] text-xs sm:text-sm">Actions</TableHead>
+                            <TableHead className="min-w-[80px] px-2 py-2 sm:px-3 text-xs">Date</TableHead>
+                            <TableHead className="min-w-[120px] px-2 py-2 sm:px-3 text-xs">Description</TableHead>
+                            <TableHead className="min-w-[90px] px-2 py-2 sm:px-3 text-xs">Category</TableHead>
+                            <TableHead className="min-w-[60px] px-2 py-2 sm:px-3 text-xs">Type</TableHead>
+                            <TableHead className="text-right min-w-[80px] px-2 py-2 sm:px-3 text-xs">Amount</TableHead>
+                            <TableHead className="text-center min-w-[70px] px-2 py-2 sm:px-3 text-xs">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -518,23 +519,23 @@ export default function TransactionsPage() {
                             }
                             return (
                                 <TableRow key={tx.id}>
-                                    <TableCell className="text-xs sm:text-sm">{displayDate}</TableCell>
-                                    <TableCell className="font-medium text-xs sm:text-sm">{tx.description}</TableCell>
-                                    <TableCell className="text-xs sm:text-sm">{tx.category}</TableCell>
-                                    <TableCell className={`capitalize text-xs sm:text-sm ${tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    <TableCell className="px-2 py-2 sm:px-3 text-xs">{displayDate}</TableCell>
+                                    <TableCell className="font-medium px-2 py-2 sm:px-3 text-xs">{tx.description}</TableCell>
+                                    <TableCell className="px-2 py-2 sm:px-3 text-xs">{tx.category}</TableCell>
+                                    <TableCell className={`capitalize px-2 py-2 sm:px-3 text-xs ${tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                         {tx.type}
                                     </TableCell>
-                                    <TableCell className={`text-right font-semibold text-xs sm:text-sm ${tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    <TableCell className={`text-right font-semibold px-2 py-2 sm:px-3 text-xs ${tx.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                     {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
                                     </TableCell>
-                                    <TableCell className="text-center space-x-0 sm:space-x-1">
-                                        <Button variant="ghost" size="icon" aria-label="Edit transaction" onClick={() => openEditForm(tx)}>
-                                            <Edit3 className="h-4 w-4" />
+                                    <TableCell className="text-center px-2 py-2 sm:px-3 space-x-0">
+                                        <Button variant="ghost" size="icon" aria-label="Edit transaction" onClick={() => openEditForm(tx)} className="h-7 w-7 sm:h-8 sm:w-8">
+                                            <Edit3 className="h-3 w-3 sm:h-4 sm:w-4" />
                                         </Button>
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
-                                                <Button variant="ghost" size="icon" aria-label="Delete transaction">
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                <Button variant="ghost" size="icon" aria-label="Delete transaction" className="h-7 w-7 sm:h-8 sm:w-8">
+                                                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-destructive" />
                                                 </Button>
                                             </AlertDialogTrigger>
                                             <AlertDialogContent>

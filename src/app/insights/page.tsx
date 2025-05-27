@@ -4,7 +4,6 @@
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-// Input and Label removed as they are no longer used for health score
 import { Lightbulb, Loader2, AlertTriangle, Info, TrendingUp, TrendingDown, ShieldCheck, Sparkles } from 'lucide-react';
 import { getSavingsOpportunities, type GetSavingsOpportunitiesOutput } from '@/ai/flows/savings-opportunities';
 import { getFinancialHealthScore, type FinancialHealthScoreOutput, type FinancialHealthScoreInput } from '@/ai/flows/financial-health-score';
@@ -12,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import Image from 'next/image';
 import { useAssets, type Asset as ContextAsset } from '@/contexts/AssetContext';
 import { useDebts, type Debt as ContextDebt } from '@/contexts/DebtContext';
-import { useTransactions, type Transaction } from '@/contexts/TransactionContext'; // Import useTransactions
+import { useTransactions, type Transaction } from '@/contexts/TransactionContext'; 
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
 import { format, parseISO, startOfMonth, subMonths, isSameMonth } from 'date-fns';
@@ -21,13 +20,12 @@ export default function AiInsightsPage() {
   const { toast } = useToast();
   const { assets } = useAssets();
   const { debts } = useDebts();
-  const { transactions } = useTransactions(); // Get transactions
+  const { transactions } = useTransactions(); 
 
   const [opportunities, setOpportunities] = useState<GetSavingsOpportunitiesOutput['opportunities'] | null>(null);
   const [isLoadingOpportunities, setIsLoadingOpportunities] = useState(false);
   const [opportunitiesError, setOpportunitiesError] = useState<string | null>(null);
 
-  // Health Score Input state is no longer needed for manual entry
   const [healthScoreResult, setHealthScoreResult] = useState<FinancialHealthScoreOutput | null>(null);
   const [isLoadingHealthScore, setIsLoadingHealthScore] = useState(false);
   const [healthScoreError, setHealthScoreError] = useState<string | null>(null);
@@ -119,8 +117,9 @@ export default function AiInsightsPage() {
       setOpportunitiesError(errorMessage);
       toast({
         title: "Error",
-        description: "An error occurred while generating insights.",
+        description: errorMessage, // Show more detailed error from Genkit
         variant: "destructive",
+        duration: 7000,
       });
     } finally {
       setIsLoadingOpportunities(false);
@@ -134,11 +133,11 @@ export default function AiInsightsPage() {
 
     const monthlyData: Record<string, { income: number, expenses: number, monthYear: string }> = {};
     const endDate = new Date();
-    const startDate = startOfMonth(subMonths(endDate, 5)); // Consider up to the last 6 months including current
+    const startDate = startOfMonth(subMonths(endDate, 5)); 
 
     txs.forEach(tx => {
       const txDate = parseISO(tx.date);
-      if (txDate >= startDate && txDate <= endDate) { // Only consider transactions in the last 6 months
+      if (txDate >= startDate && txDate <= endDate) { 
         const monthYear = format(txDate, 'yyyy-MM');
         if (!monthlyData[monthYear]) {
           monthlyData[monthYear] = { income: 0, expenses: 0, monthYear };
@@ -152,9 +151,6 @@ export default function AiInsightsPage() {
     });
     
     const sortedMonthlyDataValues = Object.values(monthlyData).sort((a, b) => a.monthYear.localeCompare(b.monthYear));
-    
-    // Ensure we only consider full past months up to 6, or fewer if less data exists.
-    // For simplicity here, we will average over all unique months found in the last 6 calendar months.
     
     if (sortedMonthlyDataValues.length === 0) {
         return { averageIncome: 0, averageExpenses: 0, monthsConsidered: 0 };
@@ -212,8 +208,8 @@ export default function AiInsightsPage() {
       const result = await getFinancialHealthScore({ 
         assetSummary: currentAssetSummary,
         debtSummary: currentDebtSummary,
-        averageMonthlyIncome: averageIncome, // Use calculated average
-        averageMonthlyExpenses: averageExpenses, // Use calculated average
+        averageMonthlyIncome: averageIncome, 
+        averageMonthlyExpenses: averageExpenses, 
        });
       if (result) {
         setHealthScoreResult(result);
@@ -237,8 +233,9 @@ export default function AiInsightsPage() {
       setHealthScoreError(errorMessage);
       toast({
         title: "Error",
-        description: "An error occurred while generating your financial health score.",
+        description: errorMessage, // Show more detailed error from Genkit
         variant: "destructive",
+        duration: 7000,
       });
     } finally {
       setIsLoadingHealthScore(false);
@@ -254,24 +251,25 @@ export default function AiInsightsPage() {
 
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">AI Financial Insights</h1>
-        <p className="text-muted-foreground">
-          Get personalized optimization suggestions and financial health assessments.
-        </p>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+        <div>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">AI Financial Insights</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
+            Get personalized optimization suggestions and financial health assessments.
+          </p>
+        </div>
       </div>
 
       <Card className="rounded-2xl shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> Financial Health Score</CardTitle>
-          <CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg md:text-xl"><Sparkles className="h-5 w-5 text-primary" /> Financial Health Score</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
             Your financial health score is calculated using your tracked assets, debts, and automatically derived average monthly income and expenses from your transaction history (last 6 months).
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-           {/* Removed Input fields for averageMonthlyIncome and averageMonthlyExpenses */}
-          <Button onClick={handleGetHealthScore} disabled={isLoadingHealthScore || !assets || assets.length === 0 || !transactions || transactions.length === 0} className="w-full sm:w-auto">
+        <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
+          <Button onClick={handleGetHealthScore} disabled={isLoadingHealthScore || !assets || assets.length === 0 || !transactions || transactions.length === 0} className="w-full sm:w-auto text-xs sm:text-sm">
             {isLoadingHealthScore ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -284,30 +282,30 @@ export default function AiInsightsPage() {
           )}
         </CardContent>
         {healthScoreResult && !isLoadingHealthScore && (
-          <CardFooter className="flex flex-col items-start gap-4 pt-4 border-t">
+          <CardFooter className="flex flex-col items-start gap-3 sm:gap-4 pt-4 border-t p-4 sm:p-6">
             <div className="w-full text-center">
-              <p className="text-sm text-muted-foreground">Your Score</p>
-              <p className="text-6xl font-bold" style={{ color: `hsl(var(--${getScoreColor(healthScoreResult.score).replace('bg-', '')}))` }}>
+              <p className="text-xs sm:text-sm text-muted-foreground">Your Score</p>
+              <p className="text-4xl sm:text-5xl md:text-6xl font-bold" style={{ color: `hsl(var(--${getScoreColor(healthScoreResult.score).replace('bg-', '')}))` }}>
                 {healthScoreResult.score}
-                <span className="text-xl text-muted-foreground">/1000</span>
+                <span className="text-lg sm:text-xl text-muted-foreground">/1000</span>
               </p>
-              <Progress value={(healthScoreResult.score / 1000) * 100} className="h-3 mt-2 rounded-lg" indicatorClassName={getScoreColor(healthScoreResult.score)} />
-              <p className="text-lg font-semibold mt-1" style={{ color: `hsl(var(--${getScoreColor(healthScoreResult.score).replace('bg-', '')}))` }}>
+              <Progress value={(healthScoreResult.score / 1000) * 100} className="h-2 sm:h-3 mt-2 rounded-lg" indicatorClassName={getScoreColor(healthScoreResult.score)} />
+              <p className="text-md sm:text-lg font-semibold mt-1" style={{ color: `hsl(var(--${getScoreColor(healthScoreResult.score).replace('bg-', '')}))` }}>
                 {healthScoreResult.assessment}
               </p>
             </div>
             {healthScoreResult.positiveFactors && healthScoreResult.positiveFactors.length > 0 && (
                 <div className="w-full">
-                    <h4 className="font-semibold text-md flex items-center gap-2"><TrendingUp className="h-5 w-5 text-green-500"/> Positive Factors</h4>
-                    <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 mt-1">
+                    <h4 className="font-semibold text-sm sm:text-md flex items-center gap-2"><TrendingUp className="h-4 sm:h-5 w-4 sm:w-5 text-green-500"/> Positive Factors</h4>
+                    <ul className="list-disc list-inside text-xs sm:text-sm text-muted-foreground space-y-1 mt-1">
                         {healthScoreResult.positiveFactors.map((factor, i) => <li key={`pos-${i}`}>{factor}</li>)}
                     </ul>
                 </div>
             )}
             {healthScoreResult.areasForImprovement && healthScoreResult.areasForImprovement.length > 0 && (
                  <div className="w-full">
-                    <h4 className="font-semibold text-md flex items-center gap-2"><TrendingDown className="h-5 w-5 text-orange-500"/> Areas for Improvement</h4>
-                    <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 mt-1">
+                    <h4 className="font-semibold text-sm sm:text-md flex items-center gap-2"><TrendingDown className="h-4 sm:h-5 w-4 sm:w-5 text-orange-500"/> Areas for Improvement</h4>
+                    <ul className="list-disc list-inside text-xs sm:text-sm text-muted-foreground space-y-1 mt-1">
                         {healthScoreResult.areasForImprovement.map((area, i) => <li key={`imp-${i}`}>{area}</li>)}
                     </ul>
                 </div>
@@ -315,7 +313,7 @@ export default function AiInsightsPage() {
           </CardFooter>
         )}
         {healthScoreError && !isLoadingHealthScore && (
-            <CardFooter className="pt-4 border-t">
+            <CardFooter className="pt-4 border-t p-4 sm:p-6">
                 <div className="flex items-center gap-2 text-sm text-destructive">
                     <AlertTriangle className="h-5 w-5" />
                     <span>{healthScoreError}</span>
@@ -323,13 +321,15 @@ export default function AiInsightsPage() {
             </CardFooter>
         )}
          {((!assets || assets.length === 0) || (!transactions || transactions.length === 0)) && !isLoadingHealthScore && (
-                <CardFooter className="pt-4 border-t">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Info className="h-5 w-5 text-primary" />
+                <CardFooter className="pt-4 border-t p-4 sm:p-6">
+                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                         <span>
                             Financial health score calculation requires both asset data and transaction history.
                             {!assets || assets.length === 0 ? " Please add assets." : ""}
                             {!transactions || transactions.length === 0 ? " Please add transactions." : ""}
+                             {assets?.length === 0 && <Link href="/assets" className="underline hover:text-primary ml-1">Go to Assets</Link>}
+                             {transactions?.length === 0 && <Link href="/transactions" className="underline hover:text-primary ml-1">Go to Transactions</Link>}
                         </span>
                     </div>
                 </CardFooter>
@@ -338,20 +338,20 @@ export default function AiInsightsPage() {
 
 
       <Card className="rounded-2xl shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Lightbulb className="h-5 w-5 text-primary" /> Savings & Optimization Opportunities</CardTitle>
-          <CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg md:text-xl"><Lightbulb className="h-5 w-5 text-primary" /> Savings & Optimization Opportunities</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
             Analyze your manually entered assets (from the Assets page) to generate financial opportunities.
             {(!assets || assets.length === 0) && (
-                <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
-                    <Info className="h-5 w-5 text-primary" />
+                <div className="mt-2 flex items-start gap-2 text-sm text-muted-foreground p-2 sm:p-3 bg-muted/50 rounded-md">
+                    <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                     <span>No assets are currently being tracked. Please go to the <Link href="/assets" className="underline hover:text-primary">Assets page</Link> to add some.</span>
                 </div>
             )}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Button onClick={handleGetOpportunities} disabled={isLoadingOpportunities || !assets || assets.length === 0} className="w-full sm:w-auto">
+        <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
+          <Button onClick={handleGetOpportunities} disabled={isLoadingOpportunities || !assets || assets.length === 0} className="w-full sm:w-auto text-xs sm:text-sm">
             {isLoadingOpportunities ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -362,33 +362,33 @@ export default function AiInsightsPage() {
         </CardContent>
       
         {opportunitiesError && !isLoadingOpportunities && (!opportunities || opportunities.length === 0) && (
-          <CardFooter className="pt-4 border-t">
-            <div className="flex items-center gap-2 text-sm text-destructive">
-                <AlertTriangle className="h-5 w-5" />
+          <CardFooter className="pt-4 border-t p-4 sm:p-6">
+            <div className="flex items-start gap-2 text-sm text-destructive">
+                <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
                 <span>{opportunitiesError}</span>
             </div>
           </CardFooter>
         )}
 
         {opportunities && opportunities.length > 0 && !isLoadingOpportunities && (
-          <CardFooter className="flex flex-col items-start gap-4 pt-4 border-t">
-            <h3 className="text-xl font-semibold">Suggested Opportunities</h3>
-            <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 w-full">
+          <CardFooter className="flex flex-col items-start gap-3 sm:gap-4 pt-4 border-t p-4 sm:p-6">
+            <h3 className="text-lg sm:text-xl font-semibold">Suggested Opportunities</h3>
+            <div className="grid gap-4 sm:gap-6 md:grid-cols-1 lg:grid-cols-2 w-full">
               {opportunities.map((op, index) => (
                 <Card key={index} className="rounded-xl shadow-md">
-                  <CardHeader className="flex flex-row items-start justify-between gap-2 pb-3">
+                  <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2 sm:pb-3 p-3 sm:p-4">
                     <div>
-                      <CardTitle className="text-md">{op.category}</CardTitle>
+                      <CardTitle className="text-sm sm:text-md">{op.category}</CardTitle>
                       {op.potentialSavings && (
-                        <CardDescription className="font-semibold text-green-600 dark:text-green-400">
+                        <CardDescription className="font-semibold text-green-600 dark:text-green-400 text-xs sm:text-sm">
                           Potential Benefit: {op.potentialSavings}
                         </CardDescription>
                       )}
                     </div>
-                    <Image src="https://placehold.co/32x32.png" alt="Suggestion icon" width={32} height={32} data-ai-hint="idea lightbulb" className="rounded-md" />
+                    <Image src="https://placehold.co/32x32.png" alt="Suggestion icon" width={24} height={24} sm-width={32} sm-height={32} data-ai-hint="idea lightbulb" className="rounded-md" />
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{op.description}</p>
+                  <CardContent className="p-3 sm:p-4 pt-0">
+                    <p className="text-xs sm:text-sm text-muted-foreground">{op.description}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -397,9 +397,9 @@ export default function AiInsightsPage() {
         )}
         
         {!isLoadingOpportunities && !opportunitiesError && opportunities && opportunities.length === 0 && (
-            <CardFooter className="pt-4 border-t">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Info className="h-5 w-5 text-primary" />
+            <CardFooter className="pt-4 border-t p-4 sm:p-6">
+                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                     <span>Based on your current assets, the AI could not identify any specific new optimization opportunities at this time.</span>
                 </div>
             </CardFooter>
@@ -409,3 +409,4 @@ export default function AiInsightsPage() {
     </div>
   );
 }
+

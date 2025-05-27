@@ -6,7 +6,7 @@ import type { AssetCategory } from "@/contexts/AssetContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Bitcoin, Landmark, BarChartBig, WalletCards, TrendingUp, DollarSign, PiggyBank, Building2, AlertTriangle, Target, Plane, ShieldCheck, AreaChart, PieChart as PieChartIcon, Info, CreditCard, Home, Car, Gift } from "lucide-react"; 
+import { Bitcoin, Landmark, BarChartBig, WalletCards, TrendingUp, DollarSign, PiggyBank, Building2, AlertTriangle, Target, Plane, ShieldCheck, AreaChart, PieChart as PieChartIcon, Info, CreditCard, Home, Car, Gift, ExternalLink } from "lucide-react"; 
 import Link from "next/link";
 import Image from 'next/image';
 import { useAssets } from "@/contexts/AssetContext"; 
@@ -18,13 +18,13 @@ import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, L
 
 
 const categoryIcons: Record<AssetCategory | 'total' | 'allocation', React.ReactNode> = {
-  crypto: <Bitcoin className="h-6 w-6 text-orange-500" />,
-  stock: <BarChartBig className="h-6 w-6 text-green-500" />,
-  mutualfund: <WalletCards className="h-6 w-6 text-indigo-500" />,
-  bank: <Landmark className="h-6 w-6 text-blue-500" />,
-  property: <Building2 className="h-6 w-6 text-purple-500" />,
-  total: <DollarSign className="h-6 w-6 text-primary" />,
-  allocation: <PieChartIcon className="h-6 w-6 text-teal-500" />
+  crypto: <Bitcoin className="h-5 w-5 sm:h-6 sm:w-6 text-orange-500" />,
+  stock: <BarChartBig className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />,
+  mutualfund: <WalletCards className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-500" />,
+  bank: <Landmark className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />,
+  property: <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />,
+  total: <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />,
+  allocation: <PieChartIcon className="h-5 w-5 sm:h-6 sm:w-6 text-teal-500" />
 };
 
 const goalDisplayIcons: Record<string, React.ReactNode> = {
@@ -47,14 +47,14 @@ interface CategorySummary {
 }
 
 const PREDEFINED_COLORS = [
-  'hsl(231, 48%, 48%)', // Primary Blue
-  'hsl(261, 44%, 58%)', // Accent Purple
-  'hsl(210, 30%, 56%)', // Muted Blue/Gray
-  'hsl(35, 92%, 58%)',  // Orange
-  'hsl(120, 70%, 40%)', // Green
-  'hsl(190, 80%, 55%)', // Teal
-  'hsl(0, 70%, 60%)',   // Reddish
-  'hsl(45, 100%, 50%)', // Yellow
+  'hsl(231, 48%, 48%)', 
+  'hsl(261, 44%, 58%)', 
+  'hsl(210, 30%, 56%)', 
+  'hsl(35, 92%, 58%)',  
+  'hsl(120, 70%, 40%)', 
+  'hsl(190, 80%, 55%)', 
+  'hsl(0, 70%, 60%)',   
+  'hsl(45, 100%, 50%)', 
 ];
 
 const RADIAN = Math.PI / 180;
@@ -194,16 +194,16 @@ export default function HomePage() {
   const isMixedCurrencyAllocation = currenciesPresentInAllocation.size > 1;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Your financial overview. Prices are manually entered.
           </p>
         </div>
          <Link href="/transactions" passHref>
-           <Button>
+           <Button className="w-full sm:w-auto mt-2 sm:mt-0">
              <DollarSign className="mr-2 h-4 w-4" /> Add Transaction
            </Button>
         </Link>
@@ -211,15 +211,15 @@ export default function HomePage() {
 
       {Object.keys(portfolioTotalsByCurrency).length > 0 ? (
         <Card className="rounded-2xl shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg sm:text-xl">Total Net Worth</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg md:text-xl">Total Net Worth</CardTitle>
             {categoryIcons['total']}
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             {Object.entries(portfolioTotalsByCurrency).map(([currency, total]) => (
-              <div key={currency} className="text-xl sm:text-2xl md:text-3xl font-bold text-primary mb-1">
+              <div key={currency} className="text-lg sm:text-xl md:text-2xl font-bold text-primary mb-1">
                 {formatCurrency(total, currency)}
-                <span className="text-sm text-muted-foreground ml-1">({currency})</span>
+                <span className="text-xs sm:text-sm text-muted-foreground ml-1">({currency})</span>
               </div>
             ))}
             <p className="text-xs text-muted-foreground pt-1">Calculated from manually entered current asset values.</p>
@@ -227,13 +227,13 @@ export default function HomePage() {
         </Card>
       ) : (
          <Card className="rounded-2xl shadow-lg col-span-1 md:col-span-2 lg:col-span-3">
-            <CardContent className="pt-6 text-center text-muted-foreground">
-                <WalletCards className="mx-auto h-12 w-12 mb-4 text-primary" />
-                <p className="text-lg font-semibold">Welcome to FinTrack!</p>
-                <p>Start by adding an asset to see your financial dashboard populate.</p>
-                <div className="mt-4 flex justify-center gap-2">
+            <CardContent className="pt-6 text-center text-muted-foreground p-4 sm:p-6">
+                <WalletCards className="mx-auto h-10 w-10 sm:h-12 sm:w-12 mb-4 text-primary" />
+                <p className="text-md sm:text-lg font-semibold">Welcome to FinTrack!</p>
+                <p className="text-sm">Start by adding an asset to see your financial dashboard populate.</p>
+                <div className="mt-4 flex flex-col sm:flex-row justify-center gap-2">
                     <Link href="/assets" passHref>
-                        <Button><WalletCards className="mr-2 h-4 w-4"/> Add Asset</Button>
+                        <Button className="w-full sm:w-auto"><WalletCards className="mr-2 h-4 w-4"/> Add Asset</Button>
                     </Link>
                 </div>
             </CardContent>
@@ -242,20 +242,20 @@ export default function HomePage() {
 
       {assetAllocationData.length > 0 && (
         <Card className="rounded-2xl shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg sm:text-xl">Asset Allocation</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg md:text-xl">Asset Allocation</CardTitle>
             {categoryIcons['allocation']}
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             {isMixedCurrencyAllocation && (
-              <div className="mb-2 text-xs text-muted-foreground flex items-center gap-1 p-2 bg-muted/50 rounded-md">
+              <div className="mb-2 text-xs text-muted-foreground flex items-center gap-1 p-2 bg-muted/50 rounded-lg">
                 <Info className="h-4 w-4 text-primary shrink-0" />
                 <span>Note: This chart sums numerical values of assets in different currencies without conversion.</span>
               </div>
             )}
-            <ChartContainer config={{}} className="aspect-video h-[200px] sm:h-[250px] md:h-[300px] w-full">
+            <ChartContainer config={{}} className="aspect-video h-[180px] xs:h-[200px] sm:h-[250px] md:h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <PieChart margin={{ top: 10, right: 10, bottom: 20, left: 10 }}>
                   <RechartsTooltip
                     contentStyle={{ borderRadius: "0.5rem", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)"}}
                     formatter={(value: number, name: string) => {
@@ -272,7 +272,8 @@ export default function HomePage() {
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={80}
+                    outerRadius={60}
+                    smOuterRadius={80} // Example for slightly larger on sm+
                     labelLine={false}
                     label={renderCustomizedLabel}
                   >
@@ -281,11 +282,11 @@ export default function HomePage() {
                     ))}
                   </Pie>
                   <Legend 
-                    iconSize={10} 
+                    iconSize={8} 
                     layout="horizontal" 
                     verticalAlign="bottom" 
                     align="center"
-                    wrapperStyle={{paddingTop: "10px", fontSize: "0.75rem"}} // Adjusted legend style
+                    wrapperStyle={{paddingTop: "10px", fontSize: "0.7rem"}} 
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -300,7 +301,7 @@ export default function HomePage() {
         {Object.entries(categorySummariesByCurrency).map(([currency, summaries]) => (
           <React.Fragment key={`${currency}-fragment`}>
             {Object.keys(portfolioTotalsByCurrency).length > 1 && (
-              <h2 key={`${currency}-header`} className="text-lg sm:text-xl font-semibold tracking-tight mt-6 border-b pb-2 col-span-1 sm:col-span-2 lg:col-span-3">Asset Summaries ({currency})</h2>
+              <h2 key={`${currency}-header`} className="text-md sm:text-lg font-semibold tracking-tight mt-4 sm:mt-6 border-b pb-2 col-span-1 sm:col-span-2 lg:col-span-3">Asset Summaries ({currency})</h2>
             )}
             {orderedCategories.map((category) => {
               const summary = summaries[category];
@@ -322,12 +323,12 @@ export default function HomePage() {
                   whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
                 >
                   <Card className="rounded-2xl shadow-lg h-full flex flex-col">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-base font-medium">{titleMap[category]}</CardTitle>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4 md:p-6">
+                      <CardTitle className="text-sm sm:text-base font-medium">{titleMap[category]}</CardTitle>
                       {categoryIcons[category]}
                     </CardHeader>
-                    <CardContent className="flex-grow">
-                      <div className="text-xl sm:text-2xl font-bold">{formatCurrency(summary.totalValue, currency)}</div>
+                    <CardContent className="flex-grow p-3 sm:p-4 md:p-6 pt-0">
+                      <div className="text-lg sm:text-xl font-bold">{formatCurrency(summary.totalValue, currency)}</div>
                       {(category === 'stock' || category === 'crypto' || category === 'mutualfund') && summary.gainLossAmount !== undefined && summary.totalPurchaseCost !== undefined && (
                         <p className={`text-xs mt-1 ${summary.gainLossAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                           {summary.gainLossAmount >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1"/> : <AlertTriangle className="inline h-4 w-4 mr-1"/>}
@@ -340,7 +341,7 @@ export default function HomePage() {
                       )}
                         <p className="text-xs text-muted-foreground mt-1">{summary.assetCount} asset(s)</p>
                     </CardContent>
-                    <CardFooter>
+                    <CardFooter className="p-3 sm:p-4 md:p-6 pt-0">
                       <Link href={`/assets?category=${category}`} className="w-full">
                         <Button variant="outline" className="w-full text-xs sm:text-sm">
                           View All {categoryDisplayNames[category] || category.charAt(0).toUpperCase() + category.slice(1)}
@@ -362,30 +363,30 @@ export default function HomePage() {
           whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
         >
           <Card className="rounded-2xl shadow-lg h-full flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base sm:text-lg font-medium">This Month's Overview</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4 md:p-6">
+              <CardTitle className="text-sm sm:text-base md:text-lg font-medium">This Month's Overview</CardTitle>
               <PieChartIcon className="h-5 w-5 text-primary" />
             </CardHeader>
-            <CardContent className="flex-grow">
-              <div className="grid grid-cols-2 gap-4 mb-4">
+            <CardContent className="flex-grow p-3 sm:p-4 md:p-6 pt-0">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-2 sm:mb-4">
                 <div>
                   <p className="text-xs text-muted-foreground">Total Income</p>
-                  <p className="text-lg font-semibold text-green-600">{formatCurrency(totalMonthlyIncome)}</p>
+                  <p className="text-md sm:text-lg font-semibold text-green-600">{formatCurrency(totalMonthlyIncome)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Total Expenses</p>
-                  <p className="text-lg font-semibold text-red-600">{formatCurrency(totalMonthlyExpenses)}</p>
+                  <p className="text-md sm:text-lg font-semibold text-red-600">{formatCurrency(totalMonthlyExpenses)}</p>
                 </div>
               </div>
               {monthlyExpensePieChartData.length > 0 ? (
-                <ChartContainer config={{}} className="aspect-square h-[180px] sm:h-[200px] md:h-[250px] w-full">
+                <ChartContainer config={{}} className="aspect-square h-[150px] xs:h-[180px] sm:h-[200px] md:h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <RechartsTooltip
                         contentStyle={{ borderRadius: "0.5rem", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)"}}
                         formatter={(value: number, name: string, props) => [`${formatCurrency(value)} (${((value / totalMonthlyExpenses) * 100).toFixed(1)}%)`, name]}
                       />
-                      <Pie data={monthlyExpensePieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} labelLine={false}
+                      <Pie data={monthlyExpensePieChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={50} smOuterRadius={60} labelLine={false}
                           label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
                               const RADIAN = Math.PI / 180;
                               const radius = innerRadius + (outerRadius - innerRadius) * 1.3; 
@@ -394,7 +395,7 @@ export default function HomePage() {
                               const showLabel = (percent*100) > 3; 
                               if(!showLabel) return null;
                               return (
-                                  <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-[10px]">
+                                  <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-[8px] sm:text-[10px]">
                                       {name} ({(percent * 100).toFixed(0)}%)
                                   </text>
                               );
@@ -410,11 +411,11 @@ export default function HomePage() {
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">No expenses recorded this month to display chart.</p>
               )}
-              <p className="text-xs text-muted-foreground pt-2">Showing data for the current month.</p>
+              <p className="text-xs text-muted-foreground pt-2 text-center">Showing data for the current month.</p>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="p-3 sm:p-4 md:p-6 pt-0">
               <Link href="/transactions" className="w-full">
-                <Button variant="outline" className="w-full">View All Transactions</Button>
+                <Button variant="outline" className="w-full text-xs sm:text-sm">View All Transactions</Button>
               </Link>
             </CardFooter>
           </Card>
@@ -428,20 +429,20 @@ export default function HomePage() {
                 whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
               >
                 <Card className="rounded-2xl shadow-lg h-full flex flex-col">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-base sm:text-lg font-medium">Top Goal Progress</CardTitle>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4 md:p-6">
+                    <CardTitle className="text-sm sm:text-base md:text-lg font-medium">Top Goal Progress</CardTitle>
                     {goalDisplayIcons[goals[0].icon || 'Default'] || goalDisplayIcons.Default}
                   </CardHeader>
-                  <CardContent className="flex-grow">
+                  <CardContent className="flex-grow p-3 sm:p-4 md:p-6 pt-0">
                     <p className="text-md font-semibold">{goals[0].name}</p>
                     <Progress value={(goals[0].targetAmount > 0 ? (goals[0].currentAmount / goals[0].targetAmount) * 100 : 0)} className="my-2 h-2" />
                     <p className="text-xs text-muted-foreground">
                       {formatCurrency(goals[0].currentAmount, 'USD')} / {formatCurrency(goals[0].targetAmount, 'USD')}
                     </p>
                   </CardContent>
-                  <CardFooter>
+                  <CardFooter className="p-3 sm:p-4 md:p-6 pt-0">
                     <Link href="/goals" className="w-full">
-                      <Button variant="outline" className="w-full">View All Goals</Button>
+                      <Button variant="outline" className="w-full text-xs sm:text-sm">View All Goals</Button>
                     </Link>
                   </CardFooter>
                 </Card>
@@ -455,16 +456,16 @@ export default function HomePage() {
             whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
           >
             <Card className="rounded-2xl shadow-lg h-full flex flex-col">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-base sm:text-lg font-medium">Financial Goals</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4 md:p-6">
+                <CardTitle className="text-sm sm:text-base md:text-lg font-medium">Financial Goals</CardTitle>
                 <Target className="h-5 w-5 text-primary" />
               </CardHeader>
-              <CardContent className="flex-grow">
+              <CardContent className="flex-grow p-3 sm:p-4 md:p-6 pt-0">
                 <p className="text-sm">No goals set yet. Start planning your future!</p>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="p-3 sm:p-4 md:p-6 pt-0">
                 <Link href="/goals" className="w-full">
-                  <Button variant="outline" className="w-full">Set a New Goal</Button>
+                  <Button variant="outline" className="w-full text-xs sm:text-sm">Set a New Goal</Button>
                 </Link>
               </CardFooter>
             </Card>
@@ -476,17 +477,17 @@ export default function HomePage() {
           whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
         >
           <Card className="rounded-2xl shadow-lg h-full flex flex-col">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-base sm:text-lg font-medium">Budget Health</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4 md:p-6">
+                  <CardTitle className="text-sm sm:text-base md:text-lg font-medium">Budget Health</CardTitle>
                   <PiggyBank className="h-5 w-5 text-primary" />
               </CardHeader>
-              <CardContent className="flex-grow">
+              <CardContent className="flex-grow p-3 sm:p-4 md:p-6 pt-0">
                   <p className="text-sm">Your budget overview will appear here once set up.</p>
                   <p className="text-xs text-muted-foreground pt-1">Detailed budget management is available on the Budgets page.</p>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="p-3 sm:p-4 md:p-6 pt-0">
                   <Link href="/budgets" className="w-full">
-                      <Button variant="outline" className="w-full">Manage Budgets</Button>
+                      <Button variant="outline" className="w-full text-xs sm:text-sm">Manage Budgets</Button>
                   </Link>
               </CardFooter>
           </Card>
@@ -497,39 +498,39 @@ export default function HomePage() {
           whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
         >
           <Card className="rounded-2xl shadow-lg h-full flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base sm:text-lg font-medium">Debt Overview</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4 md:p-6">
+              <CardTitle className="text-sm sm:text-base md:text-lg font-medium">Debt Overview</CardTitle>
               <CreditCard className="h-5 w-5 text-primary" />
             </CardHeader>
-            <CardContent className="flex-grow">
+            <CardContent className="flex-grow p-3 sm:p-4 md:p-6 pt-0">
               <p className="text-sm">Track your liabilities and progress towards becoming debt-free.</p>
               <p className="text-xs text-muted-foreground pt-1">Detailed debt management is available on the Debts page.</p>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="p-3 sm:p-4 md:p-6 pt-0">
               <Link href="/debts" className="w-full">
-                <Button variant="outline" className="w-full">Manage Debts</Button>
+                <Button variant="outline" className="w-full text-xs sm:text-sm">Manage Debts</Button>
               </Link>
             </CardFooter>
           </Card>
         </motion.div>
         
         <motion.div
-          className="h-full md:col-span-2 lg:col-span-1" // Allow AI card to span on md if it's the last in a row of 2
+          className="h-full md:col-span-2 lg:col-span-1"
           whileHover={{ scale: 1.02, y: -3, transition: { type: "spring", stiffness: 300, damping: 15 } }}
           whileTap={{ scale: 0.99, transition: { type: "spring", stiffness: 400, damping: 10 } }}
         >
           <Card className="rounded-2xl shadow-lg h-full flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base sm:text-lg font-medium">AI Savings Tip</CardTitle>
-              <Image src="https://placehold.co/24x24.png" alt="AI Icon" width={24} height={24}/>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4 md:p-6">
+              <CardTitle className="text-sm sm:text-base md:text-lg font-medium">AI Savings Tip</CardTitle>
+              <Image src="https://placehold.co/24x24.png" alt="AI Icon" width={24} height={24} data-ai-hint="robot lightbulb" />
             </CardHeader>
-            <CardContent className="flex-grow">
+            <CardContent className="flex-grow p-3 sm:p-4 md:p-6 pt-0">
               <p className="text-sm">Review your streaming subscriptions. You could save $25/month!</p>
               <p className="text-xs text-muted-foreground pt-1">Actual AI insights based on your data are available on the Insights page.</p>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="p-3 sm:p-4 md:p-6 pt-0">
               <Link href="/insights" className="w-full">
-                <Button variant="outline" className="w-full">Get Personalized Insights</Button>
+                <Button variant="outline" className="w-full text-xs sm:text-sm">Get Personalized Insights</Button>
               </Link>
             </CardFooter>
           </Card>
