@@ -1,14 +1,17 @@
 
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { useTransactions } from '@/contexts/TransactionContext';
-import { startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
+import { startOfMonth, endOfMonth, isWithinInterval, parseISO, format, isValid } from 'date-fns';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
-import { PieChart as PieChartIcon, Info } from 'lucide-react';
+import { PieChart as PieChartIcon, Info, CalendarSearch } from 'lucide-react';
 
 // Using the same predefined colors from the dashboard for consistency
 const PREDEFINED_COLORS = [
@@ -40,27 +43,34 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
 export default function ReportsPage() {
   const { transactions } = useTransactions();
 
+  const [reportStartDate, setReportStartDate] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [reportEndDate, setReportEndDate] = useState<string>(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+
   const formatCurrency = (value: number, currencyCode: string = "USD") => {
     return value.toLocaleString(undefined, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const currentMonthExpensesByCategory = useMemo(() => {
-    const today = new Date();
-    const currentMonthStart = startOfMonth(today);
-    const currentMonthEnd = endOfMonth(today);
+  const expensesByCategoryForPeriod = useMemo(() => {
+    if (!reportStartDate || !reportEndDate) {
+      return [];
+    }
+    const startDate = parseISO(reportStartDate);
+    const endDate = parseISO(reportEndDate);
 
-    const expensesThisMonth = transactions.filter(tx => {
+    if (!isValid(startDate) || !isValid(endDate) || endDate < startDate) {
+        return []; // Or handle error state
+    }
+    
+    const expensesInPeriod = transactions.filter(tx => {
       const txDate = parseISO(tx.date);
-      return tx.type === 'expense' && isWithinInterval(txDate, { start: currentMonthStart, end: currentMonthEnd });
+      return tx.type === 'expense' && isValid(txDate) && isWithinInterval(txDate, { start: startDate, end: endDate });
     });
 
-    const aggregated = expensesThisMonth.reduce((acc, tx) => {
+    const aggregated = expensesInPeriod.reduce((acc, tx) => {
       if (!acc[tx.category]) {
-        acc[tx.category] = { totalAmount: 0, currency: 'USD' }; // Assuming a default currency for reports or detecting it
+        acc[tx.category] = { totalAmount: 0, currency: 'USD' }; 
       }
       acc[tx.category].totalAmount += tx.amount;
-      // For simplicity, report chart will assume a single currency or sum raw values.
-      // A more robust solution would handle multi-currency aggregation.
       return acc;
     }, {} as Record<string, { totalAmount: number, currency: string }>);
 
@@ -68,21 +78,27 @@ export default function ReportsPage() {
       .map(([category, data]) => ({
         name: category,
         value: data.totalAmount,
-        // currency: data.currency // Could be used if we report per currency
       }))
       .sort((a, b) => b.value - a.value);
-  }, [transactions]);
+  }, [transactions, reportStartDate, reportEndDate]);
 
-  const totalCurrentMonthExpenses = useMemo(() => {
-    return currentMonthExpensesByCategory.reduce((sum, item) => sum + item.value, 0);
-  }, [currentMonthExpensesByCategory]);
+  const totalExpensesForPeriod = useMemo(() => {
+    return expensesByCategoryForPeriod.reduce((sum, item) => sum + item.value, 0);
+  }, [expensesByCategoryForPeriod]);
 
-  const pieChartData = useMemo(() => {
-    return currentMonthExpensesByCategory.map((item, index) => ({
+  const pieChartDataForPeriod = useMemo(() => {
+    return expensesByCategoryForPeriod.map((item, index) => ({
       ...item,
       fill: PREDEFINED_COLORS[index % PREDEFINED_COLORS.length],
     }));
-  }, [currentMonthExpensesByCategory]);
+  }, [expensesByCategoryForPeriod]);
+
+  const formattedStartDate = reportStartDate && isValid(parseISO(reportStartDate)) ? format(parseISO(reportStartDate), 'MMM d, yyyy') : 'N/A';
+  const formattedEndDate = reportEndDate && isValid(parseISO(reportEndDate)) ? format(parseISO(reportEndDate), 'MMM d, yyyy') : 'N/A';
+  const reportPeriodTitle = (formattedStartDate !== 'N/A' && formattedEndDate !== 'N/A') 
+    ? `${formattedStartDate} - ${formattedEndDate}` 
+    : 'Current Month';
+
 
   return (
     <div className="space-y-6">
@@ -94,12 +110,48 @@ export default function ReportsPage() {
       </div>
 
       <Card className="rounded-2xl shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            Spending by Category 
+            <CalendarSearch className="h-5 w-5 text-primary" />
+          </CardTitle>
+          <CardDescription>Select a date range to analyze your spending.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end border p-4 rounded-lg">
+                <div>
+                    <Label htmlFor="report-start-date">Start Date</Label>
+                    <Input 
+                        id="report-start-date" 
+                        type="date" 
+                        value={reportStartDate} 
+                        onChange={(e) => setReportStartDate(e.target.value)} 
+                    />
+                </div>
+                <div>
+                    <Label htmlFor="report-end-date">End Date</Label>
+                    <Input 
+                        id="report-end-date" 
+                        type="date" 
+                        value={reportEndDate} 
+                        onChange={(e) => setReportEndDate(e.target.value)} 
+                    />
+                </div>
+            </div>
+            <div className="text-center font-medium text-primary pt-2">
+                Report for: {reportPeriodTitle}
+            </div>
+        </CardContent>
+      </Card>
+
+
+      <Card className="rounded-2xl shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle>Spending by Category - Current Month</CardTitle>
+          <CardTitle>Expense Breakdown: {reportPeriodTitle}</CardTitle>
           <PieChartIcon className="h-5 w-5 text-primary" />
         </CardHeader>
         <CardContent>
-          {currentMonthExpensesByCategory.length > 0 ? (
+          {expensesByCategoryForPeriod.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2">
               <div>
                 <ChartContainer config={{}} className="aspect-square h-[300px] w-full">
@@ -108,12 +160,12 @@ export default function ReportsPage() {
                       <RechartsTooltip
                         contentStyle={{ borderRadius: "0.5rem", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)"}}
                         formatter={(value: number, name: string) => {
-                           const percentage = totalCurrentMonthExpenses > 0 ? (value / totalCurrentMonthExpenses) * 100 : 0;
+                           const percentage = totalExpensesForPeriod > 0 ? (value / totalExpensesForPeriod) * 100 : 0;
                            return [`${formatCurrency(value)} (${percentage.toFixed(1)}%)`, name];
                         }}
                       />
                       <Pie
-                        data={pieChartData}
+                        data={pieChartDataForPeriod}
                         dataKey="value"
                         nameKey="name"
                         cx="50%"
@@ -122,7 +174,7 @@ export default function ReportsPage() {
                         labelLine={false}
                         label={renderCustomizedLabel}
                       >
-                        {pieChartData.map((entry, index) => (
+                        {pieChartDataForPeriod.map((entry, index) => (
                           <Cell key={`cell-report-${index}`} fill={entry.fill} stroke="hsl(var(--background))" strokeWidth={2}/>
                         ))}
                       </Pie>
@@ -142,18 +194,18 @@ export default function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {currentMonthExpensesByCategory.map((item) => (
+                    {expensesByCategoryForPeriod.map((item) => (
                       <TableRow key={item.name}>
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell className="text-right">{formatCurrency(item.value)}</TableCell>
                         <TableCell className="text-right">
-                          {totalCurrentMonthExpenses > 0 ? ((item.value / totalCurrentMonthExpenses) * 100).toFixed(1) : '0.0'}%
+                          {totalExpensesForPeriod > 0 ? ((item.value / totalExpensesForPeriod) * 100).toFixed(1) : '0.0'}%
                         </TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="font-bold border-t-2">
                       <TableCell>Total Expenses</TableCell>
-                      <TableCell className="text-right">{formatCurrency(totalCurrentMonthExpenses)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(totalExpensesForPeriod)}</TableCell>
                       <TableCell className="text-right">100%</TableCell>
                     </TableRow>
                   </TableBody>
@@ -163,33 +215,13 @@ export default function ReportsPage() {
           ) : (
             <div className="text-center text-muted-foreground py-8">
               <Info className="mx-auto h-12 w-12 mb-4 text-primary" />
-              <p className="text-lg font-semibold">No expenses recorded this month.</p>
-              <p>Add some transactions to see your spending breakdown.</p>
+              <p className="text-lg font-semibold">No expenses recorded for the selected period.</p>
+              <p>Try adjusting the date range or add some transactions.</p>
             </div>
           )}
         </CardContent>
       </Card>
-
-      {/* Placeholder for future reports */}
-      {/* 
-      <Card className="rounded-2xl shadow-lg">
-        <CardHeader>
-          <CardTitle>Income vs. Expense Trend (Coming Soon)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">A line or bar chart showing your income and expenses over time will appear here.</p>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl shadow-lg">
-        <CardHeader>
-          <CardTitle>Net Worth Trend (Coming Soon)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">A chart showing how your net worth changes over time will appear here.</p>
-        </CardContent>
-      </Card>
-      */}
     </div>
   );
 }
+
