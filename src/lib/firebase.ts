@@ -1,13 +1,11 @@
 
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
+// Auth is no longer initialized or exported from here for local auth
+// import { getAuth, type Auth } from 'firebase/auth'; 
 // import { getFirestore, type Firestore } from 'firebase/firestore'; // Will be used later for database
 
 // Your web app's Firebase configuration
-// IMPORTANT: Replace these with your actual Firebase project configuration values!
-// You can find these in your Firebase project settings:
-// Project settings > General > Your apps > Web app > Firebase SDK snippet > Config
-// Store these in a .env.local file (see .env.example for structure)
+// IMPORTANT: Replace these with your actual Firebase project configuration values if using other Firebase services!
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -19,16 +17,22 @@ const firebaseConfig = {
 };
 
 let app: FirebaseApp;
-let auth: Auth;
+// let auth: Auth; // Not used for local auth
 // let db: Firestore; // Will be used later
 
 if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) { // Only initialize if config is present
+    app = initializeApp(firebaseConfig);
+  } else {
+    console.warn("Firebase config missing. Firebase app not initialized. This is expected if only using local auth.");
+    // Create a dummy app object if needed by other parts of the code, or handle appropriately
+    app = {} as FirebaseApp; 
+  }
 } else {
   app = getApps()[0];
 }
 
-auth = getAuth(app);
+// auth = getAuth(app); // Not used for local auth
 // db = getFirestore(app); // Initialize Firestore later when needed
 
-export { app, auth /*, db */ };
+export { app /*, auth , db */ }; // auth is no longer exported
